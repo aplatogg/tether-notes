@@ -76,11 +76,19 @@ function SyncIndicator({ state, onRetry }: SyncIndicatorProps) {
   const Icon = content.icon;
 
   return (
-    <div className={`sync-indicator sync-${state.phase}`} role="status" aria-live="polite">
+    <div
+      className={`sync-indicator sync-${state.phase}`}
+      role="status"
+      aria-live="polite"
+      title={state.phase === "error" ? state.error : undefined}
+    >
       <Icon className={state.phase === "syncing" ? "spin" : undefined} aria-hidden="true" />
-      <span>{content.label}</span>
+      <span className="sync-label">{content.label}</span>
       {state.phase === "error" ? (
         <button type="button" onClick={onRetry}>Retry</button>
+      ) : null}
+      {state.phase === "error" && state.error ? (
+        <span className="sr-only">Sync failed: {state.error}</span>
       ) : null}
     </div>
   );

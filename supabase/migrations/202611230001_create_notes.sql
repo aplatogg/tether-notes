@@ -79,6 +79,12 @@ using ((select auth.uid()) = user_id);
 
 alter table public.notes replica identity full;
 
+-- Table privileges are separate from RLS: a table recreated by hand in the SQL
+-- editor does not inherit the dashboard's default grants.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on table public.notes to authenticated;
+revoke all on table public.notes from anon;
+
 do $$
 begin
   if not exists (

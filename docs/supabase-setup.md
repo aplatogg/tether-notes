@@ -25,6 +25,14 @@ supabase db push
 
 Alternatively, open the Supabase SQL Editor, paste the migration, and run it once. The migration guards object creation and Realtime registration so repeating it does not duplicate publication membership.
 
+If you ever recreate the table by hand (`drop table ...; create table ...`), run the privilege block too — RLS policies alone are not enough, because a manually created table has no grants:
+
+```sql
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on table public.notes to authenticated;
+revoke all on table public.notes from anon;
+```
+
 ## 3. Configure email authentication
 
 In **Authentication > Providers > Email**:
