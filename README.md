@@ -103,3 +103,8 @@ The project sets CSP, frame, content-type, referrer, permissions, HSTS, and serv
 - Notes are plain text with tags; attachments, rich text, sharing, and collaborative editing are outside this MVP.
 - Data is protected in transit and by Supabase RLS, but note content is not end-to-end encrypted.
 - Last-write-wins resolves whole-note conflicts rather than merging simultaneous edits within the body.
+
+## Deploy status
+- Vercel project `plato-ba85/tether-notes` is connected to this GitHub repository; every push to `main` creates a production deployment.
+- Live URL: https://tether-notes-three.vercel.app
+
