@@ -1,0 +1,9 @@
+# Desktop shell and build artifacts are not part of the web deployment
+src-tauri
+out
+.next
+node_modules
+.taste-skill
+docs
+coverage
+*.log
