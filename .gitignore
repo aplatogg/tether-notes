@@ -1,0 +1,51 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+/.pnpm-store
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# local environment files
+.env*
+!.env.example
+
+# deployment
+.vercel
+
+# logs
+*.log
+.pnpm-debug.log*
+
+# editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# tauri
+/src-tauri/target/
+/src-tauri/gen/schemas/
+/icon-source.png
+
+
+# design inspection artifacts
+.taste-skill/
+
