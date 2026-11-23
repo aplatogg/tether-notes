@@ -836,6 +836,174 @@ button:disabled {
   line-height: 1.62;
 }
 
+.editor-format-bar {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  gap: 4px;
+}
+
+.format-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 3px;
+}
+
+.format-button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.9;
+}
+
+.format-button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface-soft);
+  border-color: var(--sheet-border);
+}
+
+.format-button:disabled {
+  opacity: 0.4;
+}
+
+.format-button.format-subheading svg {
+  display: none;
+}
+
+.format-hint {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.note-preview {
+  flex: 1;
+  min-height: 0;
+  margin-top: 14px;
+  overflow-y: auto;
+  font-size: 16px;
+  line-height: 1.62;
+}
+
+.note-preview p {
+  margin: 0 0 12px;
+}
+
+.note-preview .note-h1 {
+  margin: 18px 0 8px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.note-preview .note-h1:first-child,
+.note-preview .note-h2:first-child {
+  margin-top: 0;
+}
+
+.note-preview .note-h2 {
+  margin: 16px 0 6px;
+  color: var(--muted);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.note-gap {
+  height: 10px;
+}
+
+.note-bullets,
+.note-ordered,
+.note-checklist {
+  margin: 0 0 12px;
+  padding-left: 2px;
+  list-style: none;
+}
+
+.note-ordered {
+  counter-reset: note-ordered;
+}
+
+.note-ordered li {
+  counter-increment: note-ordered;
+  display: flex;
+  gap: 9px;
+  padding: 2px 0;
+}
+
+.note-ordered li::before {
+  content: counter(note-ordered) ".";
+  min-width: 18px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.note-bullets li,
+.note-checklist li {
+  display: flex;
+  align-items: flex-start;
+  padding: 2px 0;
+  gap: 9px;
+}
+
+.note-bullet {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.note-check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  padding: 0;
+  border: 1.5px solid var(--control);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.note-check span {
+  display: none;
+}
+
+.note-check:hover {
+  border-color: var(--accent);
+}
+
+.note-check.is-checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.note-check svg {
+  width: 11px;
+  height: 11px;
+  color: var(--surface);
+  stroke-width: 3;
+}
+
+.note-checked-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
 .editor-footer {
   display: grid;
   grid-template-columns: auto minmax(160px, 360px) minmax(0, 1fr);

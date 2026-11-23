@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, Pin } from "lucide-react";
+import { plainPreview } from "@/lib/notes/format";
 import { displayTitle } from "@/lib/notes/model";
 import type { Note, NoteScope } from "@/lib/notes/types";
 
@@ -104,7 +105,7 @@ export function NoteList({
                   <span>{displayTitle(note)}</span>
                 </span>
                 <span className="note-row-preview">
-                  {note.body.trim() || "No additional text"}
+                  {plainPreview(note.body) || "No additional text"}
                 </span>
                 <span className="note-row-meta">
                   <span>{formatUpdatedAt(note.updatedAt)}</span>
