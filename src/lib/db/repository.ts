@@ -21,6 +21,7 @@ export const noteSchema = z
     tags: z.array(z.string()),
     isPinned: z.boolean(),
     isArchived: z.boolean(),
+    lockHash: z.string().nullable().optional(),
     deletedAt: timestampSchema.nullable(),
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
@@ -402,3 +403,4 @@ export class NotesRepository {
     });
   }
 }
+
