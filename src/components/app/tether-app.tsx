@@ -29,6 +29,7 @@ import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
 import { useNotesWorkspace } from "@/hooks/use-notes-workspace";
 import { filterNotes, normalizeTags, sortNotes } from "@/lib/notes/model";
+import { tagColor } from "@/lib/notes/tags";
 import type { Note, NoteScope } from "@/lib/notes/types";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -221,7 +222,7 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
     setMobilePane("editor");
   }
 
-  function handleDraftChange(changes: Partial<Pick<Note, "title" | "body" | "tags">>) {
+  function handleDraftChange(changes: Partial<Note>) {
     draftRevision.current += 1;
     setDraft((current) => (current ? { ...current, ...changes } : current));
     setIsDirty(true);
@@ -371,7 +372,7 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
                 key={tag}
                 onClick={() => handleTagSelect(tag)}
               >
-                <span>#{tag}</span>
+                <span style={{ color: tagColor(tag).ink }}>#{tag}</span>
                 <span className="num">{count}</span>
               </button>
             ))
@@ -644,3 +645,5 @@ export function TetherApp() {
     <CloudWorkspace client={boot.client} onUseLocalMode={() => setForceLocalMode(true)} />
   );
 }
+
+

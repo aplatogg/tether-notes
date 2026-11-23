@@ -1,10 +1,41 @@
+export type InlineType = "text" | "bold" | "italic" | "code";
+
+export interface InlineToken {
+  type: InlineType;
+  text: string;
+}
+
+const INLINE_PATTERN = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`)/g;
+
+/** Tokenizes the small inline subset we render: **bold**, *italic*, `code`. */
+export function parseInline(text: string): InlineToken[] {
+  const tokens: InlineToken[] = [];
+
+  for (const chunk of text.split(INLINE_PATTERN)) {
+    if (!chunk) continue;
+
+    if (/^\*\*[^*]+\*\*$/.test(chunk) || /^__[^_]+__$/.test(chunk)) {
+      tokens.push({ type: "bold", text: chunk.slice(2, -2) });
+    } else if (/^\*[^*\n]+\*$/.test(chunk) || /^_[^_\n]+_$/.test(chunk)) {
+      tokens.push({ type: "italic", text: chunk.slice(1, -1) });
+    } else if (/^`[^`\n]+`$/.test(chunk)) {
+      tokens.push({ type: "code", text: chunk.slice(1, -1) });
+    } else {
+      tokens.push({ type: "text", text: chunk });
+    }
+  }
+
+  return tokens.length > 0 ? tokens : [{ type: "text", text: "" }];
+}
+
 export type BlockType =
   | "heading"
   | "subheading"
   | "paragraph"
   | "bullet"
   | "ordered"
-  | "checklist";
+  | "checklist"
+  | "code";
 
 export interface NoteBlock {
   type: BlockType;
@@ -12,6 +43,8 @@ export interface NoteBlock {
   checked?: boolean;
   /** 1-based position inside an ordered list. */
   number?: number;
+  /** Fenced code language hint. */
+  language?: string;
 }
 
 const HEADING = /^#\s+(.*)$/;
@@ -19,6 +52,7 @@ const SUBHEADING = /^##\s+(.*)$/;
 const CHECKLIST = /^[-*]\s+\[( |x|X)\]\s?(.*)$/;
 const BULLET = /^[-*]\s+(.*)$/;
 const ORDERED = /^(\d{1,3})[.)]\s+(.*)$/;
+const FENCE = /^```([A-Za-z0-9+#._-]*)\s*$/;
 
 export function parseLine(line: string): NoteBlock {
   const heading = HEADING.exec(line);
@@ -46,11 +80,40 @@ export function parseLine(line: string): NoteBlock {
 }
 
 export function parseBlocks(body: string): NoteBlock[] {
-  return body.split(/\r?\n/).map(parseLine);
+  const blocks: NoteBlock[] = [];
+  const lines = body.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const fence = FENCE.exec(lines[index]);
+
+    if (fence) {
+      const code: string[] = [];
+      let cursor = index + 1;
+
+      while (cursor < lines.length && !FENCE.test(lines[cursor])) {
+        code.push(lines[cursor]);
+        cursor += 1;
+      }
+
+      blocks.push({
+        type: "code",
+        text: code.join("\n"),
+        language: fence[1] || undefined,
+      });
+      index = cursor;
+      continue;
+    }
+
+    blocks.push(parseLine(lines[index]));
+  }
+
+  return blocks;
 }
 
 export function stripBlockPrefix(line: string): string {
-  return parseLine(line).text.trim();
+  const parsed = parseLine(line);
+  if (parsed.type === "code") return line;
+  return parsed.text.trim();
 }
 
 /** First non-empty snippet with formatting markers removed, for list previews. */
@@ -58,11 +121,14 @@ export function plainPreview(body: string, maxLength = 160): string {
   const line = body
     .split(/\r?\n/)
     .map((value) => value.trim())
-    .find((value) => value.length > 0);
+    .find((value) => value.length > 0 && !FENCE.test(value));
 
   if (!line) return "";
 
-  const text = stripBlockPrefix(line);
+  const text = parseInline(stripBlockPrefix(line))
+    .map((token) => token.text)
+    .join("");
+
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
@@ -155,6 +221,64 @@ export function applyBlockStyle(
   };
 }
 
+/** Wraps or unwraps the selection with inline markers (bold, italic, code). */
+export function applyInlineStyle(
+  body: string,
+  selectionStart: number,
+  selectionEnd: number,
+  marker: "**" | "*" | "`",
+): FormatResult {
+  const start = Math.min(selectionStart, body.length);
+  const end = Math.min(Math.max(selectionEnd, start), body.length);
+  const selected = body.slice(start, end);
+  const markerLength = marker.length;
+
+  const alreadyWrapped =
+    selected.startsWith(marker) &&
+    selected.endsWith(marker) &&
+    selected.length > markerLength * 2;
+
+  let nextSelection: string;
+  let caretStart: number;
+  let caretEnd: number;
+
+  if (alreadyWrapped) {
+    nextSelection = selected.slice(markerLength, -markerLength);
+    caretStart = start;
+    caretEnd = end - markerLength * 2;
+  } else {
+    nextSelection = `${marker}${selected}${marker}`;
+    caretStart = start + markerLength;
+    caretEnd = end + markerLength;
+  }
+
+  const newBody = `${body.slice(0, start)}${nextSelection}${body.slice(end)}`;
+  return { body: newBody, selectionStart: caretStart, selectionEnd: caretEnd };
+}
+
+/** Inserts a fenced code block around the selected lines. */
+export function applyCodeBlock(
+  body: string,
+  selectionStart: number,
+  selectionEnd: number,
+): FormatResult {
+  const start = Math.min(selectionStart, body.length);
+  const end = Math.min(Math.max(selectionEnd, start), body.length);
+  const selected = body.slice(start, end);
+  const needsLeadingBreak = start > 0 && body[start - 1] !== "\n";
+  const prefix = `${needsLeadingBreak ? "\n" : ""}\`\`\`\n`;
+  const suffix = `${selected.endsWith("\n") || selected.length === 0 ? "" : "\n"}\`\`\`\n`;
+
+  const newBody = `${body.slice(0, start)}${prefix}${selected}${suffix}${body.slice(end)}`;
+  const caret = start + prefix.length;
+
+  return {
+    body: newBody,
+    selectionStart: caret,
+    selectionEnd: caret + selected.length,
+  };
+}
+
 /** Flips a checklist line; returns the body unchanged when the line is not a checklist. */
 export function toggleChecklistLine(body: string, lineIndex: number): string {
   const lines = body.split(/\r?\n/);
@@ -169,7 +293,22 @@ export function toggleChecklistLine(body: string, lineIndex: number): string {
   return lines.join("\n");
 }
 
+/** Progress for the checklist summary shown in the editor. */
+export function checklistProgress(body: string): { done: number; total: number } {
+  let done = 0;
+  let total = 0;
+
+  for (const line of body.split(/\r?\n/)) {
+    const match = CHECKLIST.exec(line);
+    if (!match) continue;
+    total += 1;
+    if (match[1].toLowerCase() === "x") done += 1;
+  }
+
+  return { done, total };
+}
+
 /** True when the body contains at least one structural line. */
 export function hasBlocks(body: string): boolean {
-  return body.split(/\r?\n/).some((line) => parseLine(line).type !== "paragraph");
+  return body.split(/\r?\n/).some((line) => parseLine(line).type !== "paragraph" || FENCE.test(line));
 }

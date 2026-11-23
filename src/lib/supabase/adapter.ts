@@ -14,6 +14,7 @@ const remoteNoteSchema = z
     tags: z.array(z.string()),
     is_pinned: z.boolean(),
     is_archived: z.boolean(),
+    lock_hash: z.string().nullable().optional(),
     deleted_at: timestampSchema.nullable(),
     created_at: timestampSchema,
     updated_at: timestampSchema,
@@ -41,6 +42,7 @@ export function noteToRemoteRow(note: Note): RemoteNoteRow {
     tags: [...note.tags],
     is_pinned: note.isPinned,
     is_archived: note.isArchived,
+    lock_hash: note.lockHash ?? null,
     deleted_at: note.deletedAt,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
@@ -58,6 +60,7 @@ export function remoteRowToNote(value: unknown): Note {
     tags: [...row.tags],
     isPinned: row.is_pinned,
     isArchived: row.is_archived,
+    lockHash: row.lock_hash ?? null,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -79,7 +82,7 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
       const { data, error } = await client
         .from("notes")
         .select(
-          "id,user_id,title,body,tags,is_pinned,is_archived,deleted_at,created_at,updated_at",
+          "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,deleted_at,created_at,updated_at",
         )
         .eq("user_id", userId)
         .order("updated_at", { ascending: true });
@@ -126,3 +129,6 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
     },
   };
 }
+
+
+

@@ -27,6 +27,7 @@ describe("Supabase note mapping", () => {
       tags: note.tags,
       is_pinned: true,
       is_archived: false,
+      lock_hash: null,
       deleted_at: null,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
@@ -36,6 +37,7 @@ describe("Supabase note mapping", () => {
   test("maps and validates a remote row as synced local state", () => {
     expect(remoteRowToNote(noteToRemoteRow(note))).toEqual({
       ...note,
+      lockHash: null,
       syncStatus: "synced",
       lastSyncError: undefined,
     });
@@ -50,3 +52,5 @@ describe("Supabase note mapping", () => {
     ).toThrow();
   });
 });
+
+

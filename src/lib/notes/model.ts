@@ -128,6 +128,7 @@ export function createDraftNote(input: CreateDraftNoteInput = {}): Note {
     tags = [],
     isPinned = false,
     isArchived = false,
+    lockHash = null,
   } = input;
 
   return {
@@ -138,6 +139,7 @@ export function createDraftNote(input: CreateDraftNoteInput = {}): Note {
     tags: [...tags],
     isPinned,
     isArchived,
+    lockHash,
     deletedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -270,3 +272,4 @@ export function sortNotes(notes: readonly Note[]): Note[] {
     })
     .map(({ note }) => note);
 }
+

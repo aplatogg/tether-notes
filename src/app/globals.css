@@ -1470,3 +1470,248 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- tag colours ---------- */
+.tag-button {
+  background: var(--tag-bg, var(--accent-soft));
+  color: var(--tag-ink, #31534f);
+}
+
+.tag-button:hover {
+  background: var(--tag-ink, var(--accent));
+  color: #ffffff;
+}
+
+/* ---------- markdown + code ---------- */
+.format-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--sheet-border);
+}
+
+.inline-code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: #0f4f4a;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
+}
+
+.note-code {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid var(--sheet-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.note-code code {
+  font: inherit;
+  white-space: pre;
+}
+
+.note-preview-scroll {
+  flex: 1;
+  min-height: 0;
+  margin-top: 12px;
+  overflow-y: auto;
+}
+
+/* ---------- lock ---------- */
+.lock-overlay {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  gap: 4px;
+}
+
+.lock-overlay > svg {
+  width: 26px;
+  height: 26px;
+  color: var(--accent);
+}
+
+.lock-overlay h2 {
+  margin: 12px 0 0;
+  font-size: 20px;
+}
+
+.lock-overlay p {
+  max-width: 320px;
+  margin: 4px 0 16px;
+  color: var(--muted);
+}
+
+.pin-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  background: rgba(20, 33, 38, 0.32);
+  place-items: center;
+}
+
+.pin-dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 22px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.pin-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.pin-dialog p {
+  margin: 6px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pin-dialog input {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  outline: 0;
+}
+
+.pin-dialog input:focus {
+  border-color: var(--accent);
+}
+
+.pin-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  gap: 8px;
+}
+
+/* ---------- share ---------- */
+.share-banner {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--sheet-border);
+  background: var(--accent-soft);
+  gap: 10px;
+}
+
+.share-banner-label {
+  font-size: 12px;
+  font-weight: 650;
+  color: #0f5f59;
+  white-space: nowrap;
+}
+
+.share-banner-url {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-banner button {
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  color: #0f5f59;
+  background: transparent;
+  font-weight: 650;
+}
+
+.share-frame {
+  display: grid;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background: var(--frame);
+  place-items: start center;
+}
+
+.share-sheet {
+  width: min(720px, 100%);
+  padding: 28px clamp(20px, 4vw, 40px) 32px;
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-sheet);
+  background: var(--surface);
+}
+
+.share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.share-back {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  gap: 6px;
+}
+
+.share-back svg {
+  width: 15px;
+  height: 15px;
+}
+
+.share-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #0f5f59;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.share-title {
+  margin: 0 0 6px;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.share-status {
+  display: flex;
+  align-items: center;
+  margin: 12px 0;
+  color: var(--muted);
+  gap: 8px;
+}
+
+.share-status svg {
+  width: 15px;
+  height: 15px;
+}
+
+.share-footer {
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.share-sheet .note-preview {
+  margin-top: 10px;
+}

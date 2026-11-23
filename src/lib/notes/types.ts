@@ -8,6 +8,8 @@ export interface Note {
   tags: string[];
   isPinned: boolean;
   isArchived: boolean;
+  /** salt:hash PBKDF2 secret; null when the note is not locked. */
+  lockHash?: string | null;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +24,7 @@ export interface CreateDraftNoteInput {
   tags?: readonly string[];
   isPinned?: boolean;
   isArchived?: boolean;
+  lockHash?: string | null;
 }
 
 export type NoteScope = "all" | "pinned" | "archived";
@@ -31,3 +34,5 @@ export interface NoteFilter {
   query?: string;
   tag?: string;
 }
+
+

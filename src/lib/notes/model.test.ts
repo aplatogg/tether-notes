@@ -20,6 +20,7 @@ function makeNote(overrides: Partial<Note> = {}): Note {
     tags: [],
     isPinned: false,
     isArchived: false,
+    lockHash: null,
     deletedAt: null,
     createdAt: "2026-11-20T00:00:00.000Z",
     updatedAt: "2026-11-20T00:00:00.000Z",
@@ -46,6 +47,7 @@ describe("createDraftNote", () => {
         tags: [],
         isPinned: false,
         isArchived: false,
+        lockHash: null,
         deletedAt: null,
         createdAt: NOW,
         updatedAt: NOW,
@@ -89,6 +91,7 @@ describe("createDraftNote", () => {
       tags?: readonly string[];
       isPinned?: boolean;
       isArchived?: boolean;
+      lockHash?: string | null;
     }>();
   });
 
@@ -483,3 +486,6 @@ describe("sortNotes", () => {
     expect(result[0]).toBe(newer);
   });
 });
+
+
+
