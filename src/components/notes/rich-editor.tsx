@@ -57,9 +57,19 @@ const TabKeymap = Extension.create({
         const item = $from.node($from.depth - 1);
         if (!item || item.type.name !== "taskItem") return false;
 
-        // An empty checklist item used to end the list; keep the checkbox alive.
+        // An empty checklist item used to end the list; append a sibling task
+        // item instead so the checkbox stays on screen.
         if (item.textContent.trim().length === 0) {
-          return editor.commands.splitListItem("taskItem");
+          const after = $from.after($from.depth - 1);
+          return editor
+            .chain()
+            .focus()
+            .insertContentAt(after, {
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [{ type: "paragraph" }],
+            })
+            .run();
         }
 
         return false;
@@ -312,6 +322,7 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
     </div>
   );
 }
+
 
 
 
