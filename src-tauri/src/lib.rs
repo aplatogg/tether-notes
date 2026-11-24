@@ -41,6 +41,13 @@ fn create_mini_window(app: &tauri::AppHandle) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -58,15 +65,25 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            create_mini_window(app.handle())?;
+            // A failure here must never abort startup: another instance (or another
+            // app) may already own the hotkey, which would otherwise force-close.
+            if let Err(error) = create_mini_window(app.handle()) {
+                eprintln!("quick capture window unavailable: {error}");
+            }
 
             let shortcut = Shortcut::new(
                 Some(Modifiers::CONTROL | Modifiers::ALT),
                 Code::KeyN,
             );
-            app.global_shortcut().register(shortcut)?;
+
+            if let Err(error) = app.global_shortcut().register(shortcut) {
+                eprintln!("global shortcut unavailable: {error}");
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running Tether Notes");
 }
+
+
