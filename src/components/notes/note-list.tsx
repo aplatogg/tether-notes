@@ -136,15 +136,17 @@ export function NoteList({
               ? "Personal"
               : selectedWorkspace
                 ? (workspaces.find((w) => w.id === selectedWorkspace)?.name ?? "Workspace")
-                : scope === "all"
-                  ? "All notes"
+                : scope === "trash"
+                  ? "Trash"
                   : scope === "pinned"
                     ? "Pinned"
                     : scope === "archived"
                       ? "Archived"
-                      : scope === "trash"
-                        ? "Trash"
-                        : "Shared with me"}
+                      : scope === "shared"
+                        ? "Shared with me"
+                        : selectedFolder
+                          ? selectedFolder
+                          : "All notes"}
           </h1>
           <p className="num">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>
         </div>

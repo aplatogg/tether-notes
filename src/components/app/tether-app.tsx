@@ -555,17 +555,37 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   }
 
   function handleTagSelect(tag: string) {
+    // Picking a tag leaves Trash/Pinned/Shared so the tag view isn't stacked on
+    // a stale scope (which used to look like "nothing updates").
+    flushCurrentDraft();
+    setScope("all");
     setSelectedTag(tag || null);
+    setSelectedWorkspace(null);
+    setSelectedFolder(null);
+    setFolderCleared(true);
+    setSelectedShareGroup(null);
+    setCalendarDay(null);
+    setSelectedId(null);
+    setDraft(null);
+    setIsDirty(false);
     setMobilePane("list");
     setNavOpen(false);
   }
 
   function handleFolderSelect(folder: string) {
     // Groups and workspaces are alternative views: selecting one clears the other
-    // so the two filters never silently stack into an empty list.
+    // so the two filters never silently stack into an empty list. Selecting a
+    // group also resets the scope so it works from Trash/Pinned/Shared too.
+    flushCurrentDraft();
+    setScope("all");
     setSelectedFolder(folder || null);
     setFolderCleared(!folder);
     setSelectedWorkspace(null);
+    setSelectedShareGroup(null);
+    setCalendarDay(null);
+    setSelectedId(null);
+    setDraft(null);
+    setIsDirty(false);
     setMobilePane("list");
     setNavOpen(false);
   }
