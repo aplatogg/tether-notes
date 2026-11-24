@@ -495,6 +495,10 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setDraft(null);
     setMobilePane("list");
     setNavOpen(false);
+    // Filters from another view must not leak into the new scope (e.g. a
+    // workspace chip sticking to Pinned/Trash and hiding everything).
+    setSelectedWorkspace(null);
+    if (nextScope !== "shared") setSelectedShareGroup(null);
     // "All notes" means every own note: drop the default General group filter.
     if (nextScope === "all") {
       setSelectedFolder(null);
