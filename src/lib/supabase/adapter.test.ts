@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Note } from "@/lib/notes/types";
-import { grantedRowToNote, noteToRemoteRow, remoteRowToNote } from "./adapter";
+import { combinePulledNotes, grantedRowToNote, noteToRemoteRow, remoteRowToNote } from "./adapter";
 
 const note: Note = {
   id: "1c622c7e-6c1d-47d9-a98f-d8c4c8a13247",
@@ -94,6 +94,18 @@ describe("Supabase note mapping", () => {
     );
     expect(locked.body).toBe("");
     expect(locked.lockHash).toBe("locked");
+  });
+
+  test("combinePulledNotes dedupes notes visible via both table and grants", () => {
+    const ownRow = noteToRemoteRow(note);
+    const grantedRow = { ...noteToRemoteRow(note), body: null, is_locked: false };
+    const meta = { ownerEmailByNote: new Map(), groupByNote: new Map() };
+
+    const combined = combinePulledNotes([ownRow], [grantedRow], "current-user", meta);
+
+    expect(combined).toHaveLength(1);
+    expect(combined[0].id).toBe(note.id);
+    expect(combined[0].shared).toBe(true); // owned by someone else -> shared
   });
 });
 

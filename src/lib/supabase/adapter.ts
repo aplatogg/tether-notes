@@ -135,7 +135,7 @@ export function grantedRowToNote(value: unknown, currentUserId?: string): Note {
   };
 }
 
-interface ShareMeta {
+export interface ShareMeta {
   ownerEmailByNote: Map<string, string>;
   groupByNote: Map<string, string>;
 }
@@ -171,6 +171,29 @@ function applyShareMeta(note: Note, meta: ShareMeta): Note {
   return note;
 }
 
+/**
+ * Combines the two pull sources without duplicates: a note that is visible both
+ * via the table (own / workspace) and via granted_notes() must appear once.
+ */
+export function combinePulledNotes(
+  ownRows: readonly unknown[],
+  grantedRows: readonly unknown[],
+  currentUserId: string,
+  meta: ShareMeta,
+): Note[] {
+  const ownIds = new Set(
+    (ownRows as Array<{ id: string }>).map((row) => row.id),
+  );
+  const own = (ownRows as readonly unknown[]).map((row) =>
+    applyShareMeta(remoteRowToNote(row, currentUserId), meta),
+  );
+  const granted = (grantedRows as readonly unknown[])
+    .filter((row) => !ownIds.has((row as { id: string }).id))
+    .map((row) => applyShareMeta(grantedRowToNote(row, currentUserId), meta));
+
+  return [...own, ...granted];
+}
+
 async function pullNotes(client: SupabaseClient, userId: string): Promise<Note[]> {
   // Own + workspace notes come from the table (RLS); grant-shared notes come from
   // granted_notes(), which masks locked bodies/lock hashes server-side.
@@ -188,14 +211,7 @@ async function pullNotes(client: SupabaseClient, userId: string): Promise<Note[]
   throwIfError(ownRes.error);
   throwIfError(grantedRes.error);
 
-  const own = (ownRes.data ?? []).map((row) =>
-    applyShareMeta(remoteRowToNote(row, userId), meta),
-  );
-  const granted = (grantedRes.data ?? []).map((row: unknown) =>
-    applyShareMeta(grantedRowToNote(row, userId), meta),
-  );
-
-  return [...own, ...granted];
+  return combinePulledNotes(ownRes.data ?? [], grantedRes.data ?? [], userId, meta);
 }
 
 export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
