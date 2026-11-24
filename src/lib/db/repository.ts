@@ -119,9 +119,14 @@ export class NotesRepository {
         ? []
         : await this.database.notes.where("workspaceIndex").equals(1).toArray();
 
-    return sortNotes(
-      [...own, ...shared, ...workspaceNotes].map((note) => parseNote(fromStoredNote(note))),
-    );
+    // A note can match several buckets (own + workspace, own + shared):
+    // dedupe by id so list() never returns it twice.
+    const byId = new Map<string, (typeof own)[number]>();
+    for (const note of [...own, ...shared, ...workspaceNotes]) {
+      byId.set(note.id, note);
+    }
+
+    return sortNotes([...byId.values()].map((note) => parseNote(fromStoredNote(note))));
   }
 
   private async assertNotShared(noteId: string): Promise<void> {

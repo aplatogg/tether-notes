@@ -586,8 +586,7 @@ describe("NotesRepository", () => {
     expect(await database.notes.count()).toBe(0);
   });
 
-  test("pruneRemoteMissing drops stale rows but keeps pending and other accounts' rows", async () => {
-    // Present remotely: kept.
+  test("pruneRemoteMissing drops stale rows but keeps pending and other accounts' rows", async () => {    // Present remotely: kept.
     await repository.applyRemoteUpsert(
       makeNote({ id: "remote-note", syncStatus: "synced" }),
     );
@@ -613,5 +612,18 @@ describe("NotesRepository", () => {
     expect(await repository.get("pending-note")).toBeDefined();
     expect(await repository.get("other-user-note")).toBeDefined();
     expect(await repository.listOutbox("user-1")).toHaveLength(1);
+  });
+
+  test("list() returns a workspace note owned by this user only once", async () => {
+    const workspaceNote = makeNote({
+      id: "ws-own",
+      workspaceId: "90b40e54-7493-484e-b43c-bc61395c74de",
+      syncStatus: "synced",
+    });
+    await repository.applyRemoteUpsert(workspaceNote);
+    await repository.applyRemoteUpsert(makeNote({ id: "plain-own", syncStatus: "synced" }));
+
+    const listed = await repository.list("user-1");
+    expect(listed.map((note) => note.id).sort()).toEqual(["plain-own", "ws-own"]);
   });
 });
