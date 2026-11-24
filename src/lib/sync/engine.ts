@@ -41,13 +41,18 @@ export interface SyncEngineOptions {
 
 type StateListener = (state: SyncEngineState) => void;
 
+export type RemoteEvent =
+  | { type: "note"; note: Note }
+  | { type: "delete"; noteId: string };
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 export class SyncEngine {
   private readonly listeners = new Set<StateListener>();
-  private readonly remoteListeners = new Set<() => void>();
+  private readonly remoteListeners = new Set<(event: RemoteEvent) => void>();
+  private lastPull: Note[] | null = null;
   private readonly maxAttempts: number;
   private readonly retryDelayMs: (attempt: number) => number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
@@ -87,11 +92,16 @@ export class SyncEngine {
   }
 
   /** Fires whenever a realtime remote note/delete arrives. */
-  onRemote(listener: () => void): () => void {
+  onRemote(listener: (event: RemoteEvent) => void): () => void {
     this.remoteListeners.add(listener);
     return () => {
       this.remoteListeners.delete(listener);
     };
+  }
+
+  /** Rows from the most recent successful pull (null until the first one). */
+  getLastPull(): Note[] | null {
+    return this.lastPull ? [...this.lastPull] : null;
   }
 
   async start(): Promise<void> {
@@ -106,7 +116,7 @@ export class SyncEngine {
       async (note) => {
         await this.repository.mergeRemote(note);
         await this.refreshPendingState();
-        for (const listener of this.remoteListeners) listener();
+        for (const listener of this.remoteListeners) listener({ type: "note", note });
       },
       (error) => {
         this.setState({
@@ -125,7 +135,7 @@ export class SyncEngine {
           await this.repository.hardDelete(noteId);
         }
         await this.refreshPendingState();
-        for (const listener of this.remoteListeners) listener();
+        for (const listener of this.remoteListeners) listener({ type: "delete", noteId });
       },
     );
   }
@@ -205,6 +215,7 @@ export class SyncEngine {
     }
 
     const remoteNotes = await this.adapter.pull(this.userId);
+    this.lastPull = remoteNotes;
 
     for (const note of remoteNotes) {
       // Own notes, grant-shared notes (read-only), and workspace notes (collaborative).

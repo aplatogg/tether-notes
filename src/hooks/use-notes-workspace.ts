@@ -9,6 +9,7 @@ import { selectExpired } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
 import {
   SyncEngine,
+  type RemoteEvent,
   type SyncAdapter,
   type SyncEngineState,
 } from "@/lib/sync/engine";
@@ -77,52 +78,31 @@ export function useNotesWorkspace(
     }
   }, [repository, userId, syncTick]);
 
-  // In Supabase mode the server is the display source of truth: re-pull after
-  // every sync so the UI always shows server state, never a stale local cache.
-  // Pulls are coalesced (debounce + single flight) because one save produces a
-  // sync tick plus a realtime echo — without this each edit cost two full pulls.
-  // Local-only mode (no adapter) keeps using IndexedDB directly.
+  // In Supabase mode the server is the display source of truth, but the data
+  // comes from the sync engine's own pull (no second request) and realtime
+  // events are applied in place. Local-only mode keeps using IndexedDB.
   const [serverNotes, setServerNotes] = useState<Note[] | null>(null);
-  const pullControl = useRef({ timer: 0, running: false, pending: false });
 
-  const refreshFromServer = useEffectEvent(async () => {
-    if (!adapter || !repository || userId === null) return;
-
-    if (pullControl.current.running) {
-      pullControl.current.pending = true;
-      return;
-    }
-
-    pullControl.current.running = true;
-    try {
-      const pulled = await adapter.pull(userId);
-      setServerNotes(
-        [...pulled].sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        ),
-      );
-    } catch {
-      // Offline or pull failed: keep showing the local cache.
-    } finally {
-      pullControl.current.running = false;
-      if (pullControl.current.pending) {
-        pullControl.current.pending = false;
-        await refreshFromServer();
-      }
-    }
+  const applyPulled = useEffectEvent((pulled: Note[]) => {
+    setServerNotes(
+      [...pulled].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    );
   });
 
-  useEffect(() => {
-    if (!adapter || !repository || userId === null) return;
-    const control = pullControl.current;
-    if (control.timer) window.clearTimeout(control.timer);
-    control.timer = window.setTimeout(() => {
-      void refreshFromServer();
-    }, 250);
-    return () => {
-      if (control.timer) window.clearTimeout(control.timer);
-    };
-  }, [adapter, repository, userId, syncTick]);
+  const applyRemoteEvent = useEffectEvent((event: RemoteEvent) => {
+    setServerNotes((current) => {
+      if (!current) return current;
+      if (event.type === "delete") {
+        return current.filter((note) => note.id !== event.noteId);
+      }
+      const rest = current.filter((note) => note.id !== event.note.id);
+      return [event.note, ...rest].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+    });
+  });
 
   const notes =
     adapter !== null && userId !== null ? (serverNotes ?? localNotes) : localNotes;
@@ -160,13 +140,14 @@ export function useNotesWorkspace(
       setSyncState(next);
       if (next.phase === "synced" || next.phase === "error" || next.phase === "local-only") {
         setSyncTick((tick) => tick + 1);
+        const pulled = engine.getLastPull();
+        if (pulled) applyPulled(pulled);
       }
     });
     const handleConnectionChange = () => void engine.sync();
     const handleFocus = () => void engine.sync();
-    // Realtime note/delete arrivals also re-pull so the server-driven list
-    // reflects them immediately.
-    const offRemote = engine.onRemote(() => setSyncTick((tick) => tick + 1));
+    // Realtime arrivals are applied in place; no extra pull needed.
+    const offRemote = engine.onRemote((event) => applyRemoteEvent(event));
 
     window.addEventListener("online", handleConnectionChange);
     window.addEventListener("offline", handleConnectionChange);

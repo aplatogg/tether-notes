@@ -275,18 +275,36 @@ describe("SyncEngine", () => {
       { sleep: async () => undefined },
     );
     let fired = 0;
-    const off = engine.onRemote(() => {
+    let received: { type: string; id?: string } | null = null;
+    const off = engine.onRemote((event) => {
       fired += 1;
+      received = event.type === "note" ? { type: "note", id: event.note.id } : { type: "delete", id: event.noteId };
     });
 
     await engine.start();
     await onRemote?.(makeNote({ id: "live-2", updatedAt: "2026-11-25T00:00:00.000Z" }));
 
     expect(fired).toBe(1);
+    expect(received).toEqual({ type: "note", id: "live-2" });
     off();
     await onRemote?.(makeNote({ id: "live-3", updatedAt: "2026-11-25T00:00:00.000Z" }));
     expect(fired).toBe(1);
     await engine.stop();
+  });
+
+  test("exposes the rows from the latest pull for the server-driven list", async () => {
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        pull: async () => [makeNote({ id: "pulled-1", syncStatus: "synced" })],
+      }),
+      USER_ID,
+      { sleep: async () => undefined },
+    );
+
+    expect(engine.getLastPull()).toBeNull();
+    await engine.sync();
+    expect(engine.getLastPull()?.map((note) => note.id)).toEqual(["pulled-1"]);
   });
 
   test("prunes local rows that vanished from the remote pull", async () => {
