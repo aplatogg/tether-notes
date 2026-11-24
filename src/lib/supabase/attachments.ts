@@ -23,6 +23,9 @@ const attachmentRowSchema = z.object({
 
 const BUCKET = "attachments";
 
+/** Hard cap so a public deployment can't be used to park huge files in the bucket. */
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
 function toAttachment(row: unknown): NoteAttachment {
   const parsed = attachmentRowSchema.parse(row);
   return {
@@ -62,6 +65,12 @@ export async function uploadAttachment(
   file: Blob,
   fileName: string,
 ): Promise<NoteAttachment> {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(
+      `File too large: ${formatBytes(file.size)} (max ${formatBytes(MAX_ATTACHMENT_BYTES)})`,
+    );
+  }
+
   const path = `${userId}/${noteId}/${globalThis.crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
 
   const { error: uploadError } = await client.storage

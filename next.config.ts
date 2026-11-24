@@ -10,7 +10,8 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  // BYOK AI summary posts to the user's own OpenAI-compatible endpoint, so any https origin must be allowed.
+  "connect-src 'self' https: wss:",
   "worker-src 'self'",
   "manifest-src 'self'",
   "object-src 'none'",
@@ -27,7 +28,8 @@ const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    // microphone=(self) is required for voice-note recording in the web build.
+    value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
   },
   ...(!isDevelopment
     ? [
