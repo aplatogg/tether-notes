@@ -510,11 +510,15 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   }
 
   function handleWorkspaceSelect(workspaceId: string | null) {
-    // Switching workspace switches the whole view: reset the group filter so
-    // the list isn't accidentally empty.
+    // Switching workspace switches the whole view: reset the group filter and
+    // the open note so the editor doesn't keep showing a note from another view.
+    flushCurrentDraft();
     setSelectedWorkspace(workspaceId);
     setSelectedFolder(null);
     setFolderCleared(true);
+    setSelectedId(null);
+    setDraft(null);
+    setIsDirty(false);
     setMobilePane("list");
     setNavOpen(false);
   }
@@ -803,6 +807,22 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
                   value={newWorkspaceName}
                   onChange={(event) => setNewWorkspaceName(event.target.value)}
                 />
+                <div className="pin-actions">
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={!newWorkspaceName.trim()}
+                  >
+                    Create
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setCreatingWorkspace(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </form>
             ) : null}
             <button
