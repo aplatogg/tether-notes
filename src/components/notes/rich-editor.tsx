@@ -36,6 +36,8 @@ import { countWords, markdownToHtml } from "@/lib/notes/rich";
 /** Tab nests list items, moves through tables, or inserts spaces in prose. */
 const TabKeymap = Extension.create({
   name: "tabKeymap",
+  // Run before the task/list Enter handlers so our behaviour wins.
+  priority: 1000,
   addKeyboardShortcuts() {
     return {
       Tab: () => {
@@ -310,6 +312,7 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
     </div>
   );
 }
+
 
 
 
