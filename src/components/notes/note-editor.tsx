@@ -31,7 +31,7 @@ import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
 import { normalizeTags } from "@/lib/notes/model";
 import type { Note } from "@/lib/notes/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { createShareLink } from "@/lib/supabase/share";
+import { createShareLink, revokeShareLink } from "@/lib/supabase/share";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -264,6 +264,21 @@ export function NoteEditor({
               >
                 Copy
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const client = getSupabaseBrowserClient();
+                  if (note && client) {
+                    void revokeShareLink(client, note.id)
+                      .then(() => setShare(null))
+                      .catch((error: unknown) => setShareError(error instanceof Error ? error.message : String(error)));
+                  } else {
+                    setShare(null);
+                  }
+                }}
+              >
+                Revoke
+              </button>
               <button type="button" onClick={() => setShare(null)}>Dismiss</button>
             </div>
           ) : null}
@@ -440,4 +455,5 @@ export function NoteEditor({
     </section>
   );
 }
+
 

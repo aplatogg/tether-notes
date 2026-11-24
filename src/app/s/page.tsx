@@ -52,6 +52,10 @@ function SharedNoteView() {
     };
   }, [token]);
 
+  useEffect(() => {
+    if (note?.title) document.title = `${note.title} — Shared note`;
+  }, [note]);
+
   return (
     <main className="share-frame">
       <article className="share-sheet">
@@ -107,3 +111,4 @@ export default function SharedNotePage() {
     </Suspense>
   );
 }
+

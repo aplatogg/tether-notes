@@ -1,3 +1,4 @@
+import { stripBlockPrefix } from "./format";
 import type { CreateDraftNoteInput, Note, NoteFilter } from "./types";
 
 const MAX_DISPLAY_TITLE_LENGTH = 80;
@@ -158,7 +159,8 @@ export function displayTitle(note: Note): string {
     const trimmedLine = line.trim();
 
     if (trimmedLine) {
-      return truncateGraphemes(trimmedLine, MAX_DISPLAY_TITLE_LENGTH);
+      const plain = stripBlockPrefix(trimmedLine).trim();
+      return truncateGraphemes(plain || trimmedLine, MAX_DISPLAY_TITLE_LENGTH);
     }
   }
 
@@ -201,7 +203,7 @@ export function matchesSearch(note: Note, query: string): boolean {
   const normalizedTags = note.tags.map(normalizeTag).filter(Boolean);
   const searchableFields = [
     normalizeSearchText(note.title),
-    normalizeSearchText(note.body),
+    ...(note.lockHash ? [] : [normalizeSearchText(note.body)]),
     ...normalizedTags,
     ...normalizedTags.map((tag) => `#${tag}`),
   ];
@@ -272,4 +274,5 @@ export function sortNotes(notes: readonly Note[]): Note[] {
     })
     .map(({ note }) => note);
 }
+
 
