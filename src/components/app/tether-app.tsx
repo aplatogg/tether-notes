@@ -746,7 +746,13 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setImportError(null);
     try {
       const text = await file.text();
-      const imported = parseImportJson(text);
+      let imported: Note[];
+      try {
+        imported = parseImportJson(text);
+      } catch {
+        setImportError("That file is not a valid Tether Notes JSON export.");
+        return;
+      }
       let count = 0;
       for (const note of imported) {
         await workspace.saveNote({ ...note, userId, shared: false, sharedFor: null, ownerEmail: null });
