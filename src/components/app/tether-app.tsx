@@ -207,11 +207,23 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     [notesWithDraft, workspace.customFolders],
   );
 
-  // Default view: the user's own "General" group, unless the user cleared the filter.
+  // Default view: the user's own "General" group, but only when it actually has
+  // personal notes (workspace notes don't count), unless the user cleared it.
   const [folderCleared, setFolderCleared] = useState(false);
+  const hasPersonalDefaultGroup = useMemo(
+    () =>
+      notesWithDraft.some(
+        (note) =>
+          !note.shared &&
+          !note.workspaceId &&
+          note.deletedAt === null &&
+          (note.folder ?? "").trim() === DEFAULT_GROUP,
+      ),
+    [notesWithDraft],
+  );
   const effectiveFolder =
     selectedFolder ??
-    (folderCleared || scope !== "all" || !folders.includes(DEFAULT_GROUP) ? null : DEFAULT_GROUP);
+    (folderCleared || scope !== "all" || !hasPersonalDefaultGroup ? null : DEFAULT_GROUP);
 
   const filteredNotes = useMemo(
     () =>
