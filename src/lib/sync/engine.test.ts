@@ -100,6 +100,49 @@ describe("SyncEngine", () => {
     expect(engine.getState().phase).toBe("synced");
   });
 
+  test("merges notes shared with us from the remote pull", async () => {
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        pull: async () => [
+          makeNote({
+            id: "shared-note",
+            userId: "owner-9",
+            title: "Shared with me",
+            shared: true,
+            sharedFor: USER_ID,
+            ownerEmail: "owner@example.com",
+            updatedAt: "2026-11-23T00:00:00.000Z",
+          }),
+        ],
+      }),
+      USER_ID,
+      { sleep: async () => undefined },
+    );
+
+    await engine.sync();
+
+    const stored = await repository.get("shared-note");
+    expect(stored?.shared).toBe(true);
+    expect(stored?.ownerEmail).toBe("owner@example.com");
+    expect((await repository.list(USER_ID)).map((note) => note.id)).toContain("shared-note");
+    // Shared notes never enter the outbox for this user.
+    expect(await repository.listOutbox(USER_ID)).toEqual([]);
+    expect(engine.getState().phase).toBe("synced");
+  });
+
+  test("rejects local edits to a shared note", async () => {
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "shared-note", userId: "owner-9", shared: true, sharedFor: USER_ID }),
+    );
+
+    await expect(
+      repository.localUpsert(makeNote({ id: "shared-note", userId: "owner-9", shared: true, title: "Hacked" })),
+    ).rejects.toThrow("read-only");
+    await expect(repository.localSoftDelete("shared-note")).rejects.toThrow("read-only");
+    await expect(repository.restore("shared-note")).rejects.toThrow("read-only");
+  });
+
   test("flushes queued upserts and soft deletes", async () => {
     const pushed: string[] = [];
     const deleted: string[] = [];

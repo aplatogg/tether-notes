@@ -40,7 +40,17 @@ describe("Supabase note mapping", () => {
       lockHash: null,
       syncStatus: "synced",
       lastSyncError: undefined,
+      shared: false,
+      sharedFor: null,
+      ownerEmail: null,
     });
+  });
+
+  test("marks rows owned by someone else as shared with the current user", () => {
+    const mapped = remoteRowToNote(noteToRemoteRow(note), "current-user");
+    expect(mapped.shared).toBe(true);
+    expect(mapped.sharedFor).toBe("current-user");
+    expect(remoteRowToNote(noteToRemoteRow(note), note.userId ?? undefined).shared).toBe(false);
   });
 
   test("rejects local-only notes and malformed remote rows", () => {

@@ -1594,6 +1594,45 @@ button:disabled {
   gap: 8px;
 }
 
+.grant-list {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.grant-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sheet-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.grant-list .danger-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: #b3261e;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.grant-empty {
+  margin-top: 12px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+
 /* ---------- share ---------- */
 .share-banner {
   display: flex;

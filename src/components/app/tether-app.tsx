@@ -23,6 +23,7 @@ import {
   Tags,
   Trash2,
   UserRound,
+  UsersRound,
   WifiOff,
 } from "lucide-react";
 import { AuthPanel } from "@/components/auth/auth-panel";
@@ -146,6 +147,7 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
       all: filterNotes(notesWithDraft, { scope: "all" }).length,
       pinned: filterNotes(notesWithDraft, { scope: "pinned" }).length,
       archived: filterNotes(notesWithDraft, { scope: "archived" }).length,
+      shared: filterNotes(notesWithDraft, { scope: "shared" }).length,
       trash: filterNotes(notesWithDraft, { scope: "trash" }).length,
     }),
     [notesWithDraft],
@@ -383,6 +385,7 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
             ["all", FileText, "All notes"],
             ["pinned", Pin, "Pinned"],
             ["archived", Archive, "Archived"],
+            ["shared", UsersRound, "Shared with me"],
             ["trash", Trash2, "Trash"],
           ] as const).map(([value, Icon, label]) => (
             <button

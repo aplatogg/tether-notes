@@ -359,6 +359,22 @@ describe("filterNotes", () => {
     ).toEqual(["match"]);
   });
 
+  test("shared scope returns only non-deleted notes shared with us", () => {
+    const sharedNotes = [
+      makeNote({ id: "own" }),
+      makeNote({ id: "shared", shared: true, sharedFor: "me", ownerEmail: "a@x.io" }),
+      makeNote({ id: "shared-deleted", shared: true, deletedAt: "2026-11-24T00:00:00.000Z" }),
+      makeNote({ id: "other-owner", userId: "someone-else" }),
+    ];
+
+    expect(filterNotes(sharedNotes, { scope: "shared" }).map((note) => note.id)).toEqual([
+      "shared",
+    ]);
+    expect(
+      filterNotes(sharedNotes, { scope: "shared", query: "own" }).map((note) => note.id),
+    ).toEqual([]);
+  });
+
   test("does not mutate the input collection", () => {
     const input = Object.freeze([...notes]);
 

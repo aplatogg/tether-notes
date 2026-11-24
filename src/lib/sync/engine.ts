@@ -184,7 +184,8 @@ export class SyncEngine {
     const remoteNotes = await this.adapter.pull(this.userId);
 
     for (const note of remoteNotes) {
-      if (note.userId === this.userId) {
+      // Own notes plus notes shared with us; shared ones are read-only locally.
+      if (note.userId === this.userId || note.shared) {
         await this.repository.mergeRemote(note);
       }
     }

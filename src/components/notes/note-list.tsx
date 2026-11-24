@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Lock, Pin } from "lucide-react";
+import { FileText, Lock, Pin, UsersRound } from "lucide-react";
 import { bodyToPlainText } from "@/lib/notes/rich";
 import { displayTitle } from "@/lib/notes/model";
 import { tagColor } from "@/lib/notes/tags";
@@ -47,6 +47,14 @@ function emptyMessage(scope: NoteScope, query: string, selectedTag: string | nul
     return "Archived notes will wait here.";
   }
 
+  if (scope === "shared") {
+    return "Notes other people share with you appear here (read-only).";
+  }
+
+  if (scope === "trash") {
+    return "Deleted notes stay here for 30 days.";
+  }
+
   return "Capture the first thought in this workspace.";
 }
 
@@ -70,7 +78,7 @@ export function NoteList({
     >
       <header className="pane-heading">
         <div>
-          <h1>{scope === "all" ? "All notes" : scope === "pinned" ? "Pinned" : "Archived"}</h1>
+           <h1>{scope === "all" ? "All notes" : scope === "pinned" ? "Pinned" : scope === "archived" ? "Archived" : scope === "trash" ? "Trash" : "Shared with me"}</h1>
           <p className="num">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>
         </div>
         <button className="mobile-new-button" type="button" onClick={onCreate}>
@@ -102,8 +110,9 @@ export function NoteList({
             >
               <button className="note-row-main" type="button" onClick={() => onSelect(note)}>
                 <span className="note-row-title">
-                  {note.isPinned ? <Pin aria-label="Pinned" /> : null}
-                  {note.lockHash ? <Lock aria-label="Locked" /> : null}
+                   {note.isPinned ? <Pin aria-label="Pinned" /> : null}
+                   {note.lockHash ? <Lock aria-label="Locked" /> : null}
+                   {note.shared ? <UsersRound aria-label={`Shared by ${note.ownerEmail ?? "someone"}`} /> : null}
                   <span>{displayTitle(note)}</span>
                 </span>
                 <span className="note-row-preview">

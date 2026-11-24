@@ -66,3 +66,48 @@ export async function fetchSharedNote(
     isLocked: row.is_locked === true,
   };
 }
+
+export interface NoteGrantEntry {
+  granteeId: string;
+  email: string;
+}
+
+/** Owner lists the accounts a note is shared with. */
+export async function listNoteGrants(
+  client: SupabaseClient,
+  noteId: string,
+): Promise<NoteGrantEntry[]> {
+  const { data, error } = await client.rpc("note_grant_emails", { p_note_id: noteId });
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row: { grantee_id: string; email: string }) => ({
+    granteeId: row.grantee_id,
+    email: row.email,
+  }));
+}
+
+/** Owner shares a note with another account by email (read-only for them). */
+export async function grantNoteToEmail(
+  client: SupabaseClient,
+  noteId: string,
+  email: string,
+): Promise<void> {
+  const { error } = await client.rpc("share_note_with_email", {
+    p_note_id: noteId,
+    p_email: email.trim(),
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Owner revokes one account's access to a note. */
+export async function revokeNoteGrant(
+  client: SupabaseClient,
+  noteId: string,
+  granteeId: string,
+): Promise<void> {
+  const { error } = await client.rpc("revoke_note_share", {
+    p_note_id: noteId,
+    p_grantee_id: granteeId,
+  });
+  if (error) throw new Error(error.message);
+}

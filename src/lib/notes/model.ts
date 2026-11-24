@@ -230,6 +230,13 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
       return false;
     }
 
+    if (filter.scope === "shared") {
+      if (!note.shared || note.deletedAt !== null) return false;
+      if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) return false;
+      if (query.length === 0) return true;
+      return matchesSearch(note, query);
+    }
+
     if (filter.scope === "all" && note.isArchived) {
       return false;
     }

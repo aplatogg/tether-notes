@@ -25,6 +25,7 @@ export interface StoredNote extends Note {
   pinnedIndex?: 0 | 1;
   archivedIndex?: 0 | 1;
   deletedIndex?: 0 | 1;
+  sharedIndex?: 0 | 1;
 }
 
 export interface NotesDatabaseOptions {
@@ -64,6 +65,22 @@ export class NotesDatabase extends Dexie {
           });
       });
 
+    this.version(3)
+      .stores({
+        notes:
+          "id, userId, ownerKey, sharedIndex, updatedAt, isArchived, isPinned, deletedAt, [userId+updatedAt], [userId+isArchived], [userId+isPinned], [userId+deletedAt], [ownerKey+updatedAt], [ownerKey+archivedIndex], [ownerKey+pinnedIndex], [ownerKey+deletedIndex]",
+        outbox: "noteId, userId, kind, operationId, createdAt, updatedAt",
+        metadata: "key",
+      })
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<StoredNote, string>("notes")
+          .toCollection()
+          .modify((note) => {
+            note.sharedIndex = note.shared ? 1 : 0;
+          });
+      });
+
     this.meta = this.table("metadata");
   }
 }
@@ -73,15 +90,16 @@ export function ownerKeyFor(userId: string | null): string {
 }
 
 export function noteIndexFields(
-  note: Pick<Note, "userId" | "isPinned" | "isArchived" | "deletedAt">,
+  note: Pick<Note, "userId" | "isPinned" | "isArchived" | "deletedAt" | "shared">,
 ): Required<
-  Pick<StoredNote, "ownerKey" | "pinnedIndex" | "archivedIndex" | "deletedIndex">
+  Pick<StoredNote, "ownerKey" | "pinnedIndex" | "archivedIndex" | "deletedIndex" | "sharedIndex">
 > {
   return {
     ownerKey: ownerKeyFor(note.userId),
     pinnedIndex: note.isPinned ? 1 : 0,
     archivedIndex: note.isArchived ? 1 : 0,
     deletedIndex: note.deletedAt === null ? 0 : 1,
+    sharedIndex: note.shared ? 1 : 0,
   };
 }
 
@@ -95,6 +113,7 @@ export function fromStoredNote(note: StoredNote): Note {
   delete value.pinnedIndex;
   delete value.archivedIndex;
   delete value.deletedIndex;
+  delete value.sharedIndex;
 
   return value;
 }

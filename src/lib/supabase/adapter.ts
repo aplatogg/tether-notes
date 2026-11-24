@@ -49,8 +49,9 @@ export function noteToRemoteRow(note: Note): RemoteNoteRow {
   });
 }
 
-export function remoteRowToNote(value: unknown): Note {
+export function remoteRowToNote(value: unknown, currentUserId?: string): Note {
   const row = remoteNoteSchema.parse(value);
+  const shared = currentUserId !== undefined && row.user_id !== currentUserId;
 
   return {
     id: row.id,
@@ -66,6 +67,9 @@ export function remoteRowToNote(value: unknown): Note {
     updatedAt: row.updated_at,
     syncStatus: "synced",
     lastSyncError: undefined,
+    shared,
+    sharedFor: shared ? (currentUserId ?? null) : null,
+    ownerEmail: null,
   };
 }
 
@@ -79,16 +83,32 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
 
   return {
     async pull(userId) {
+      // RLS returns our own notes plus notes shared with us; no user_id filter.
       const { data, error } = await client
         .from("notes")
         .select(
           "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,deleted_at,created_at,updated_at",
         )
-        .eq("user_id", userId)
         .order("updated_at", { ascending: true });
 
       throwIfError(error);
-      return (data ?? []).map(remoteRowToNote);
+
+      const owners = await client.rpc("my_shared_note_owners");
+      if (owners.error) throw new Error(owners.error.message);
+      const ownerEmailByNote = new Map<string, string>(
+        (owners.data ?? []).map((row: { note_id: string; owner_email: string }) => [
+          row.note_id,
+          row.owner_email,
+        ]),
+      );
+
+      return (data ?? []).map((row) => {
+        const note = remoteRowToNote(row, userId);
+        if (note.shared) {
+          note.ownerEmail = ownerEmailByNote.get(note.id) ?? null;
+        }
+        return note;
+      });
     },
 
     upsert: write,
@@ -100,23 +120,19 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
     },
 
     subscribe(userId, onRemoteNote, onError) {
+      // No user_id filter: RLS already limits rows to ours plus shared ones.
       const channel = client
         .channel(`notes:${userId}:${globalThis.crypto.randomUUID()}`)
         .on(
           "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "notes",
-            filter: `user_id=eq.${userId}`,
-          },
+          { event: "*", schema: "public", table: "notes" },
           (payload) => {
             if (!payload.new || Object.keys(payload.new).length === 0) {
               return;
             }
 
             try {
-              void onRemoteNote(remoteRowToNote(payload.new));
+              void onRemoteNote(remoteRowToNote(payload.new, userId));
             } catch (error) {
               onError(error);
             }

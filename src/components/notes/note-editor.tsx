@@ -14,6 +14,8 @@ import {
   PinOff,
   Save,
   Trash2,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { RichEditor } from "@/components/notes/rich-editor";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
@@ -21,7 +23,14 @@ import { normalizeTags } from "@/lib/notes/model";
 import { trashDaysLeft } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { createShareLink, revokeShareLink } from "@/lib/supabase/share";
+import {
+  createShareLink,
+  grantNoteToEmail,
+  listNoteGrants,
+  revokeNoteGrant,
+  revokeShareLink,
+  type NoteGrantEntry,
+} from "@/lib/supabase/share";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -70,8 +79,13 @@ export function NoteEditor({
   const [share, setShare] = useState<{ url: string; copied: boolean } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [grantsOpen, setGrantsOpen] = useState(false);
+  const [grants, setGrants] = useState<NoteGrantEntry[]>([]);
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantBusy, setGrantBusy] = useState(false);
 
   const locked = Boolean(note?.lockHash) && !(note ? unlocked[note.id] : false);
+  const readOnly = note?.shared === true;
 
   function commitTags() {
     if (!note) return;
@@ -150,6 +164,70 @@ export function NoteEditor({
     }
   }
 
+  async function openGrantsDialog() {
+    if (!note || !note.userId) {
+      setShareError("Sign in before sharing a note with someone.");
+      return;
+    }
+
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      setShareError("Sharing needs the Supabase configuration.");
+      return;
+    }
+
+    setGrantsOpen(true);
+    setShareError(null);
+    setGrantBusy(true);
+
+    try {
+      setGrants(await listNoteGrants(client, note.id));
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGrantBusy(false);
+    }
+  }
+
+  async function addGrant() {
+    if (!note || !grantEmail.trim()) return;
+
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+
+    setGrantBusy(true);
+    setShareError(null);
+
+    try {
+      await grantNoteToEmail(client, note.id, grantEmail);
+      setGrants(await listNoteGrants(client, note.id));
+      setGrantEmail("");
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGrantBusy(false);
+    }
+  }
+
+  async function removeGrant(granteeId: string) {
+    if (!note) return;
+
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+
+    setGrantBusy(true);
+    setShareError(null);
+
+    try {
+      await revokeNoteGrant(client, note.id, granteeId);
+      setGrants(await listNoteGrants(client, note.id));
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGrantBusy(false);
+    }
+  }
+
   return (
     <section
       className="note-editor-pane"
@@ -166,48 +244,72 @@ export function NoteEditor({
               {noteStateLabel(note, isDirty, isLocalOnly)}
             </span>
             <div className="editor-actions">
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => void copyShareLink()}
-                aria-label="Copy share link"
-                title="Copy share link"
-                disabled={shareBusy || locked}
-              >
-                {shareBusy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Link2 aria-hidden="true" />}
-              </button>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => void openPinModal(note.lockHash ? "remove" : "set")}
-                aria-label={note.lockHash ? "Remove note lock" : "Lock note"}
-                title={note.lockHash ? "Remove lock" : "Lock note"}
-                aria-pressed={Boolean(note.lockHash)}
-              >
-                {note.lockHash ? <Lock aria-hidden="true" /> : <LockOpen aria-hidden="true" />}
-              </button>
-              <button className="icon-button" type="button" onClick={onSave} aria-label="Save note" title="Save (Ctrl or Cmd + S)">
-                <Save aria-hidden="true" />
-              </button>
-              <button className="icon-button" type="button" onClick={onTogglePin} aria-label={note.isPinned ? "Unpin note" : "Pin note"} title={note.isPinned ? "Unpin" : "Pin"}>
-                {note.isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
-              </button>
-              <button className="icon-button" type="button" onClick={onToggleArchive} aria-label={note.isArchived ? "Restore note" : "Archive note"} title={note.isArchived ? "Restore" : "Archive"}>
-                {note.isArchived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
-              </button>
-              <button className="icon-button danger-button" type="button" onClick={onDelete} aria-label="Delete note" title="Delete">
-                <Trash2 aria-hidden="true" />
-              </button>
+              {readOnly ? null : (
+                <>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => void copyShareLink()}
+                    aria-label="Copy share link"
+                    title="Copy share link"
+                    disabled={shareBusy || locked}
+                  >
+                    {shareBusy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Link2 aria-hidden="true" />}
+                  </button>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => void openGrantsDialog()}
+                    aria-label="Share with user"
+                    title="Share with a user by email (read-only for them)"
+                    disabled={locked}
+                  >
+                    <UserPlus aria-hidden="true" />
+                  </button>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => void openPinModal(note.lockHash ? "remove" : "set")}
+                    aria-label={note.lockHash ? "Remove note lock" : "Lock note"}
+                    title={note.lockHash ? "Remove lock" : "Lock note"}
+                    aria-pressed={Boolean(note.lockHash)}
+                  >
+                    {note.lockHash ? <Lock aria-hidden="true" /> : <LockOpen aria-hidden="true" />}
+                  </button>
+                  <button className="icon-button" type="button" onClick={onSave} aria-label="Save note" title="Save (Ctrl or Cmd + S)">
+                    <Save aria-hidden="true" />
+                  </button>
+                  <button className="icon-button" type="button" onClick={onTogglePin} aria-label={note.isPinned ? "Unpin note" : "Pin note"} title={note.isPinned ? "Unpin" : "Pin"}>
+                    {note.isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+                  </button>
+                  <button className="icon-button" type="button" onClick={onToggleArchive} aria-label={note.isArchived ? "Restore note" : "Archive note"} title={note.isArchived ? "Restore" : "Archive"}>
+                    {note.isArchived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
+                  </button>
+                  <button className="icon-button danger-button" type="button" onClick={onDelete} aria-label="Delete note" title="Delete">
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                </>
+              )}
             </div>
           </header>
+
+          {readOnly ? (
+            <div className="trash-banner" role="status">
+              <span>Shared with you by {note.ownerEmail ?? "the owner"} · read-only</span>
+            </div>
+          ) : null}
 
           {note.deletedAt ? (
             <div className="trash-banner" role="status">
               <span>
                 {trashDaysLeft(note) <= 0 ? "In trash · deleting now" : `In trash · ${trashDaysLeft(note)} days left before permanent deletion`}
               </span>
-              <button type="button" onClick={onRestore}>Restore</button>
-              <button type="button" className="danger-link" onClick={onDeleteForever}>Delete forever</button>
+              {readOnly ? null : (
+                <>
+                  <button type="button" onClick={onRestore}>Restore</button>
+                  <button type="button" className="danger-link" onClick={onDeleteForever}>Delete forever</button>
+                </>
+              )}
             </div>
           ) : null}
           {note.isArchived ? (
@@ -276,7 +378,7 @@ export function NoteEditor({
                   id="note-title"
                   className="title-input"
                   defaultValue={note.title}
-                  readOnly={note.deletedAt !== null}
+                  readOnly={note.deletedAt !== null || readOnly}
                   onChange={(event) => onChange({ title: event.target.value })}
                   placeholder="Untitled note"
                   autoComplete="off"
@@ -284,7 +386,7 @@ export function NoteEditor({
                 />
                 <RichEditor
                   key={note.id}
-                  readOnly={note.deletedAt !== null}
+                  readOnly={note.deletedAt !== null || readOnly}
                   value={note.body}
                   onChange={(html) => onChange({ body: html })}
                   onSaveShortcut={onSave}
@@ -297,6 +399,7 @@ export function NoteEditor({
                   key={`tags-${note.id}`}
                   id="note-tags"
                   defaultValue={note.tags.join(", ")}
+                  readOnly={readOnly}
                   onChange={(event) => onChange({ tags: event.target.value.split(",") })}
                   onBlur={commitTags}
                   onKeyDown={(event) => {
@@ -312,6 +415,57 @@ export function NoteEditor({
               </footer>
             </>
           )}
+
+          {grantsOpen && !readOnly ? (
+            <div className="pin-backdrop" role="dialog" aria-modal="true" aria-label="Share with users">
+              <div className="pin-dialog">
+                <h2>Share with a user</h2>
+                <p>Enter an account email. They can read this note (read-only); nobody else can.</p>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void addGrant();
+                  }}
+                >
+                  <label className="sr-only" htmlFor="grant-email">Email</label>
+                  <input
+                    id="grant-email"
+                    type="email"
+                    autoFocus
+                    autoComplete="off"
+                    value={grantEmail}
+                    onChange={(event) => setGrantEmail(event.target.value)}
+                    placeholder="name@example.com"
+                  />
+                  <div className="pin-actions">
+                    <button className="secondary-button" type="button" onClick={() => setGrantsOpen(false)}>Close</button>
+                    <button className="primary-button" type="submit" disabled={grantBusy || !grantEmail.trim()}>
+                      {grantBusy ? "Working…" : "Share"}
+                    </button>
+                  </div>
+                </form>
+                {grants.length > 0 ? (
+                  <ul className="grant-list">
+                    {grants.map((grant) => (
+                      <li key={grant.granteeId}>
+                        <span>{grant.email}</span>
+                        <button
+                          type="button"
+                          className="danger-link"
+                          disabled={grantBusy}
+                          onClick={() => void removeGrant(grant.granteeId)}
+                        >
+                          <X aria-hidden="true" /> Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="grant-empty">Not shared with anyone yet.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           {pinMode ? (
             <div className="pin-backdrop" role="dialog" aria-modal="true" aria-label="Note PIN">

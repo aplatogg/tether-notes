@@ -15,6 +15,12 @@ export interface Note {
   updatedAt: string;
   syncStatus: SyncStatus;
   lastSyncError?: string;
+  /** True when this note belongs to another account and was shared with us (read-only). */
+  shared?: boolean;
+  /** The account the note was shared with (grantee), i.e. the local viewer. */
+  sharedFor?: string | null;
+  /** Owner's email, shown on notes shared with us. */
+  ownerEmail?: string | null;
 }
 
 export interface CreateDraftNoteInput {
@@ -27,7 +33,7 @@ export interface CreateDraftNoteInput {
   lockHash?: string | null;
 }
 
-export type NoteScope = "all" | "pinned" | "archived" | "trash";
+export type NoteScope = "all" | "pinned" | "archived" | "trash" | "shared";
 
 export interface NoteFilter {
   scope: NoteScope;

@@ -27,6 +27,9 @@ export const noteSchema = z
     updatedAt: timestampSchema,
     syncStatus: z.enum(["local", "pending", "synced", "error"]),
     lastSyncError: z.string().optional(),
+    shared: z.boolean().optional(),
+    sharedFor: z.string().nullable().optional(),
+    ownerEmail: z.string().nullable().optional(),
   })
   .strict();
 
@@ -88,12 +91,29 @@ export class NotesRepository {
 
   async list(userId: string | null): Promise<Note[]> {
     const ownerId = userIdSchema.parse(userId);
-    const notes = await this.database.notes
+    const own = await this.database.notes
       .where("ownerKey")
       .equals(ownerKeyFor(ownerId))
       .toArray();
+    // Notes shared with this account are stored under the owner's key but
+    // flagged with sharedFor = our user id.
+    const shared =
+      ownerId === null
+        ? []
+        : await this.database.notes
+            .where("sharedIndex")
+            .equals(1)
+            .filter((note) => note.sharedFor === ownerId)
+            .toArray();
 
-    return sortNotes(notes.map((note) => parseNote(fromStoredNote(note))));
+    return sortNotes([...own, ...shared].map((note) => parseNote(fromStoredNote(note))));
+  }
+
+  private async assertNotShared(noteId: string): Promise<void> {
+    const existing = await this.database.notes.get(noteId);
+    if (existing?.shared) {
+      throw new Error("Notes shared with you are read-only");
+    }
   }
 
   async localUpsert(value: Note): Promise<Note> {
@@ -106,6 +126,7 @@ export class NotesRepository {
       this.database.notes,
       this.database.outbox,
       async () => {
+        await this.assertNotShared(input.id);
         const existingNote = await this.database.notes.get(input.id);
         const existingMutation = await this.database.outbox.get(input.id);
         const saved = parseNote({
@@ -144,6 +165,7 @@ export class NotesRepository {
       this.database.notes,
       this.database.outbox,
       async () => {
+        await this.assertNotShared(id);
         const existingNote = await this.database.notes.get(id);
 
         if (!existingNote) {
@@ -324,6 +346,7 @@ export class NotesRepository {
       this.database.notes,
       this.database.outbox,
       async () => {
+        await this.assertNotShared(id);
         const existing = await this.database.notes.get(id);
         if (!existing) throw new Error(`Note not found: ${id}`);
 
@@ -409,12 +432,17 @@ export class NotesRepository {
           .where("ownerKey")
           .equals(ownerKeyFor(ownerId))
           .delete();
+        const sharedDeleted = await this.database.notes
+          .where("sharedIndex")
+          .equals(1)
+          .filter((note) => note.sharedFor === ownerId)
+          .delete();
         const mutationsDeleted = await this.database.outbox
           .where("userId")
           .equals(ownerId)
           .delete();
 
-        return { notesDeleted, mutationsDeleted };
+        return { notesDeleted: notesDeleted + sharedDeleted, mutationsDeleted };
       },
     );
   }
