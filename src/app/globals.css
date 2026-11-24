@@ -2063,3 +2063,13 @@ button:disabled {
   color: var(--muted);
   text-decoration: line-through;
 }
+.rich-content ul[data-type="taskList"] li > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.rich-content ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}

@@ -89,10 +89,12 @@ export function sanitizeHtml(html: string): string {
       "p", "h1", "h2", "h3", "h4", "strong", "em", "u", "s", "code", "pre",
       "ul", "ol", "li", "blockquote", "br", "hr", "a", "img", "mark",
       "table", "tbody", "thead", "tr", "th", "td", "colgroup", "col", "span", "div",
+      "label", "input",
     ],
     ALLOWED_ATTR: [
       "href", "target", "rel", "src", "alt", "title", "class", "data-type",
       "data-checked", "colspan", "rowspan", "colwidth", "style",
+      "type", "checked", "disabled",
     ],
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i,
   });
@@ -119,3 +121,4 @@ export function countWords(body: string): number {
   if (!text) return 0;
   return text.split(/\s+/).filter(Boolean).length;
 }
+
