@@ -22,8 +22,8 @@ interface NoteListProps {
   onShareGroupSelect: (group: string) => void;
   onAssignShareGroup: (note: Note, group: string, autogroup: boolean) => void;
   workspaces: Workspace[];
-  selectedWorkspace: string | null;
-  onWorkspaceSelect: (workspaceId: string | null) => void;
+  selectedWorkspace: string | "personal" | null;
+  onWorkspaceSelect: (workspaceId: string | "personal" | null) => void;
   showCalendar: boolean;
   calendarDay: string | null;
   calendarNotes: Note[];
@@ -80,7 +80,7 @@ function hasActiveFilters(
   selectedTag: string | null,
   selectedFolder: string | null,
   selectedShareGroup: string | null,
-  selectedWorkspace: string | null,
+  selectedWorkspace: string | "personal" | null,
 ): boolean {
   return Boolean(
     query.trim() || selectedTag || selectedFolder || selectedShareGroup || selectedWorkspace,
@@ -131,7 +131,21 @@ export function NoteList({
     >
       <header className="pane-heading">
         <div>
-          <h1>{scope === "all" ? "All notes" : scope === "pinned" ? "Pinned" : scope === "archived" ? "Archived" : scope === "trash" ? "Trash" : "Shared with me"}</h1>
+          <h1>
+            {selectedWorkspace === "personal"
+              ? "Personal"
+              : selectedWorkspace
+                ? (workspaces.find((w) => w.id === selectedWorkspace)?.name ?? "Workspace")
+                : scope === "all"
+                  ? "All notes"
+                  : scope === "pinned"
+                    ? "Pinned"
+                    : scope === "archived"
+                      ? "Archived"
+                      : scope === "trash"
+                        ? "Trash"
+                        : "Shared with me"}
+          </h1>
           <p className="num">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>
         </div>
         <div className="pane-heading-actions">
@@ -176,7 +190,9 @@ export function NoteList({
       {selectedWorkspace ? (
         <div className="active-filter">
           <span>
-            Workspace: {workspaces.find((w) => w.id === selectedWorkspace)?.name ?? selectedWorkspace}
+            {selectedWorkspace === "personal"
+              ? "Personal"
+              : `Workspace: ${workspaces.find((w) => w.id === selectedWorkspace)?.name ?? selectedWorkspace}`}
           </span>
           <button type="button" onClick={() => onWorkspaceSelect(null)}>Clear</button>
         </div>

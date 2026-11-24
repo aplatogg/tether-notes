@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EditorContent, Extension, useEditor, type Editor } from "@tiptap/react";
+import { EditorContent, Extension, InputRule, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import BoldMark from "@tiptap/extension-bold";
+import ItalicMark from "@tiptap/extension-italic";
+import StrikeMark from "@tiptap/extension-strike";
+import { TextSelection } from "@tiptap/pm/state";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
@@ -32,6 +36,43 @@ import {
   Undo2,
 } from "lucide-react";
 import { countWords, markdownToHtml } from "@/lib/notes/rich";
+
+/**
+ * Word-like autoformat. Markdown markers convert only when the closing marker is
+ * followed by a space (typing `**bold**x` stays literal), and only asterisks are
+ * supported — underscore variants are never converted because they destroy
+ * snake_case and __dunder__ code text.
+ */
+const WordLikeMarks = Extension.create({
+  name: "wordLikeMarks",
+  priority: 1000,
+  addInputRules() {
+    const build = (markName: "bold" | "italic", find: RegExp) =>
+      new InputRule({
+        find,
+        handler: ({ state, range, match }) => {
+          const inner = match[1];
+          const mark = state.schema.marks[markName]?.create();
+          if (!inner || !mark) return null;
+
+          // Mutate the rule's transaction: replace the whole `**text** ` run with
+          // the marked text plus the space that triggered the rule.
+          state.tr.replaceWith(range.from, range.to, [
+            state.schema.text(inner, [mark]),
+            state.schema.text(" "),
+          ]);
+          state.tr.setSelection(
+            TextSelection.create(state.tr.doc, range.from + inner.length + 1),
+          );
+        },
+      });
+
+    return [
+      build("bold", /(?<!\S)\*\*([^*\n]+)\*\*\s$/),
+      build("italic", /(?<!\S)\*(?!\*)([^*\n]+)\*\s$/),
+    ];
+  },
+});
 
 /** Tab nests list items, moves through tables, or inserts spaces in prose. */
 const TabKeymap = Extension.create({
@@ -262,7 +303,18 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        link: false,
+        // Replaced below: built-in markdown mark rules fired too eagerly.
+        bold: false,
+        italic: false,
+        strike: false,
+      }),
+      BoldMark.extend({ addInputRules: () => [] }),
+      ItalicMark.extend({ addInputRules: () => [] }),
+      StrikeMark.extend({ addInputRules: () => [] }),
+      WordLikeMarks,
       TabKeymap,
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),

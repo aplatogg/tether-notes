@@ -169,7 +169,12 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [newGroupError, setNewGroupError] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  // null = every note (All notes), "personal" = notes outside any workspace,
+  // a workspace id = that workspace. These were one null before, which mixed
+  // personal and workspace rows together.
+  const [selectedWorkspace, setSelectedWorkspace] = useState<
+    string | "personal" | null
+  >(null);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -237,9 +242,11 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           folder: effectiveFolder ?? undefined,
           day: calendarDay ?? undefined,
           shareGroup: scope === "shared" ? (selectedShareGroup ?? undefined) : undefined,
-          // null would mean "personal only" in filterNotes; no selection must be
-          // undefined so "All notes" includes workspace notes too.
-          workspace: selectedWorkspace ?? undefined,
+          // "personal" means notes outside any workspace; null means no filter.
+          workspace:
+            selectedWorkspace === "personal"
+              ? null
+              : (selectedWorkspace ?? undefined),
         }),
       ),
     [
@@ -417,7 +424,9 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
       // New notes land in the default "General" group and the selected workspace (if any).
       const changes: Partial<Note> = {};
       if (!note.folder?.trim()) changes.folder = DEFAULT_GROUP;
-      if (selectedWorkspace) changes.workspaceId = selectedWorkspace;
+      if (selectedWorkspace && selectedWorkspace !== "personal") {
+        changes.workspaceId = selectedWorkspace;
+      }
       if (Object.keys(changes).length > 0) {
         note = await workspace.saveNote({ ...note, ...changes });
       }
@@ -561,8 +570,8 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setNavOpen(false);
   }
 
-  function handleWorkspaceSelect(workspaceId: string | null) {
-    // Switching workspace switches the whole view: reset the scope (so Trash /
+  function handleWorkspaceSelect(workspaceId: string | "personal" | null) {
+    // Switching view switches the whole scope: reset the scope (so Trash /
     // Pinned / Shared don't silently stack with the workspace filter), the group
     // filter, and the open note so the editor doesn't keep showing a note from
     // another view.
@@ -940,9 +949,9 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
               </form>
             ) : null}
             <button
-              className={selectedWorkspace === null ? "is-active" : undefined}
+              className={selectedWorkspace === "personal" ? "is-active" : undefined}
               type="button"
-              onClick={() => handleWorkspaceSelect(null)}
+              onClick={() => handleWorkspaceSelect("personal")}
             >
               <span>Personal</span>
               <span className="num">{personalCount}</span>
