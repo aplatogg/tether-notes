@@ -543,6 +543,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setDraft(null);
     setMobilePane("list");
     setNavOpen(false);
+    void workspace.refreshView();
     // Filters from another view must not leak into the new scope (e.g. a
     // workspace chip sticking to Pinned/Trash and hiding everything).
     setSelectedWorkspace(null);
@@ -570,6 +571,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setIsDirty(false);
     setMobilePane("list");
     setNavOpen(false);
+    void workspace.refreshView();
   }
 
   function handleFolderSelect(folder: string) {
@@ -588,6 +590,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setIsDirty(false);
     setMobilePane("list");
     setNavOpen(false);
+    void workspace.refreshView();
   }
 
   function handleWorkspaceSelect(workspaceId: string | "personal" | null) {
@@ -608,6 +611,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setIsDirty(false);
     setMobilePane("list");
     setNavOpen(false);
+    void workspace.refreshView();
   }
 
   async function handleCreateWorkspace() {

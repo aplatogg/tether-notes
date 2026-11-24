@@ -104,6 +104,26 @@ export function useNotesWorkspace(
     });
   });
 
+  // Optimistic patch: the list reflects a local write immediately instead of
+  // waiting for the next pull to come back over the network. Plain callbacks
+  // (not Effect Events) because user handlers invoke them, and the updater form
+  // keeps them correct without subscribing to serverNotes.
+  const applyLocalPatch = (note: Note) => {
+    setServerNotes((current) => {
+      if (!current) return current;
+      const rest = current.filter((row) => row.id !== note.id);
+      return [...rest, note].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+    });
+  };
+
+  const applyLocalRemove = (noteId: string) => {
+    setServerNotes((current) =>
+      current ? current.filter((note) => note.id !== noteId) : current,
+    );
+  };
+
   const notes =
     adapter !== null && userId !== null ? (serverNotes ?? localNotes) : localNotes;
 
@@ -191,10 +211,11 @@ export function useNotesWorkspace(
     return saved;
   }
 
-  async function saveNote(note: Note): Promise<Note> {
+async function saveNote(note: Note): Promise<Note> {
     const saved = await withRepository((activeRepository) =>
       activeRepository.localUpsert(note),
     );
+    applyLocalPatch(saved);
     void engineRef.current?.sync();
     return saved;
   }
@@ -203,12 +224,15 @@ export function useNotesWorkspace(
     const saved = await withRepository((activeRepository) =>
       activeRepository.localSoftDelete(noteId),
     );
+    // Trashing keeps the row (it moves to Trash), so patch rather than remove.
+    applyLocalPatch(saved);
     void engineRef.current?.sync();
     return saved;
   }
 
   async function restoreNote(noteId: string): Promise<Note> {
     const saved = await withRepository((activeRepository) => activeRepository.restore(noteId));
+    applyLocalPatch(saved);
     void engineRef.current?.sync();
     return saved;
   }
@@ -233,13 +257,15 @@ export function useNotesWorkspace(
     );
   }
 
-  async function deleteForever(noteId: string): Promise<void> {
+async function deleteForever(noteId: string): Promise<void> {
     await withRepository(async (activeRepository) => {
       if (adapter?.purge) {
         await adapter.purge(noteId);
       }
       await activeRepository.hardDelete(noteId);
     });
+    // Nothing to re-pull for: the row is gone server-side and locally.
+    applyLocalRemove(noteId);
   }
 
   async function purgeExpiredTrash(): Promise<number> {
@@ -279,6 +305,9 @@ export function useNotesWorkspace(
     deleteForever,
     purgeExpiredTrash,
     retrySync: () => engineRef.current?.sync() ?? Promise.resolve(),
+    // View changes are cheap to refresh but frequent, so they share the engine's
+    // minimum-pull-interval gate instead of firing a request per click.
+    refreshView: () => engineRef.current?.syncSoon() ?? Promise.resolve(),
     clearStorageError: () => setStorageError(null),
   };
 }

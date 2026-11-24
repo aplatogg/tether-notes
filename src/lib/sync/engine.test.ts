@@ -307,6 +307,85 @@ describe("SyncEngine", () => {
     expect(engine.getLastPull()?.map((note) => note.id)).toEqual(["pulled-1"]);
   });
 
+  test("refreshView skips a pull made within the minimum interval", async () => {
+    let pulls = 0;
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        pull: async () => {
+          pulls += 1;
+          return [];
+        },
+      }),
+      USER_ID,
+      { sleep: async () => undefined, minPullIntervalMs: 60_000, pollIntervalMs: 0 },
+    );
+
+    await engine.sync(); // first pull
+    await engine.syncSoon(); // too soon -> skipped
+    expect(pulls).toBe(1);
+  });
+
+  test("refreshView pulls once the interval has elapsed", async () => {
+    let pulls = 0;
+    let clock = 0;
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        pull: async () => {
+          pulls += 1;
+          return [];
+        },
+      }),
+      USER_ID,
+      {
+        sleep: async () => undefined,
+        minPullIntervalMs: 1_000,
+        pollIntervalMs: 0,
+        nowMs: () => clock,
+      },
+    );
+
+    await engine.sync();
+    expect(pulls).toBe(1);
+
+    clock += 2_000;
+    await engine.syncSoon();
+    expect(pulls).toBe(2);
+  });
+
+  test("polls in the background while started and stops on stop", async () => {
+    let pulls = 0;
+    let inFlight = false;
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        pull: async () => {
+          inFlight = true;
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          pulls += 1;
+          inFlight = false;
+          return [];
+        },
+      }),
+      USER_ID,
+      { sleep: async () => undefined, pollIntervalMs: 40, minPullIntervalMs: 0 },
+    );
+
+    await engine.start();
+    expect(pulls).toBe(1);
+    expect(inFlight).toBe(false);
+
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    expect(pulls).toBeGreaterThan(1);
+
+    await engine.stop();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const atStop = pulls;
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    expect(pulls).toBe(atStop);
+  });
+
   test("prunes local rows that vanished from the remote pull", async () => {
     await repository.applyRemoteUpsert(
       makeNote({ id: "still-there", syncStatus: "synced" }),

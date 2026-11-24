@@ -37,6 +37,12 @@ export interface SyncEngineOptions {
   sleep?: (milliseconds: number) => Promise<void>;
   now?: () => string;
   isOnline?: () => boolean;
+  /** Monotonic-ish millisecond clock used by the pull throttle (tests inject it). */
+  nowMs?: () => number;
+  /** Background refresh while started; 0 disables. Default 30s. */
+  pollIntervalMs?: number;
+  /** `syncSoon()` skips a pull made less than this long ago. Default 5s. */
+  minPullIntervalMs?: number;
 }
 
 type StateListener = (state: SyncEngineState) => void;
@@ -56,11 +62,16 @@ export class SyncEngine {
   private readonly maxAttempts: number;
   private readonly retryDelayMs: (attempt: number) => number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
-  private readonly now: () => string;
+private readonly now: () => string;
+  private readonly nowMs: () => number;
   private readonly isOnline: () => boolean;
+  private readonly pollIntervalMs: number;
+  private readonly minPullIntervalMs: number;
   private state: SyncEngineState = { phase: "idle", pending: 0, attempt: 0 };
   private syncPromise: Promise<void> | null = null;
   private releaseSubscription: (() => void | Promise<void>) | null = null;
+  private pollTimer: ReturnType<typeof globalThis.setInterval> | null = null;
+  private lastPullAt = 0;
 
   constructor(
     private readonly repository: NotesRepository,
@@ -76,9 +87,12 @@ export class SyncEngine {
       ((milliseconds) =>
         new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds)));
     this.now = options.now ?? (() => new Date().toISOString());
-    this.isOnline =
+    this.nowMs = options.nowMs ?? (() => Date.now());
+this.isOnline =
       options.isOnline ??
       (() => typeof navigator === "undefined" || navigator.onLine !== false);
+    this.pollIntervalMs = Math.max(0, options.pollIntervalMs ?? 30_000);
+    this.minPullIntervalMs = Math.max(0, options.minPullIntervalMs ?? 5_000);
   }
 
   getState(): SyncEngineState {
@@ -104,8 +118,12 @@ export class SyncEngine {
     return this.lastPull ? [...this.lastPull] : null;
   }
 
-  async start(): Promise<void> {
+async start(): Promise<void> {
     await this.sync();
+
+    // Background refresh: realtime channels can silently drop (sleep, NAT
+    // timeout, missed WAL slot), leaving a stale list until the next user action.
+    this.startPolling();
 
     if (!this.adapter?.subscribe || this.releaseSubscription || !this.isOnline()) {
       return;
@@ -140,10 +158,39 @@ export class SyncEngine {
     );
   }
 
-  async stop(): Promise<void> {
+async stop(): Promise<void> {
+    this.stopPolling();
     const release = this.releaseSubscription;
     this.releaseSubscription = null;
     await release?.();
+  }
+
+  private startPolling(): void {
+    if (this.pollIntervalMs <= 0 || this.pollTimer !== null) return;
+    this.pollTimer = globalThis.setInterval(() => {
+      // Skip while offline, while hidden (focus/visibility handlers cover the
+      // return), or while a sync is already in flight; sync() is idempotent.
+      if (!this.isOnline()) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void this.sync();
+    }, this.pollIntervalMs);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer === null) return;
+    globalThis.clearInterval(this.pollTimer);
+    this.pollTimer = null;
+  }
+
+  /**
+   * Refresh for a view change: pull unless one just happened. Callers are user
+   * actions worth a request, but rapid switching must not stampede the API.
+   */
+  async syncSoon(): Promise<void> {
+    if (this.lastPullAt !== 0 && this.nowMs() - this.lastPullAt < this.minPullIntervalMs) {
+      return;
+    }
+    await this.sync();
   }
 
   async sync(): Promise<void> {
@@ -216,6 +263,7 @@ export class SyncEngine {
 
     const remoteNotes = await this.adapter.pull(this.userId);
     this.lastPull = remoteNotes;
+    this.lastPullAt = this.nowMs();
 
     for (const note of remoteNotes) {
       // Own notes, grant-shared notes (read-only), and workspace notes (collaborative).
