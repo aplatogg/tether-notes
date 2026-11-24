@@ -21,6 +21,8 @@ export interface SyncAdapter {
   pull(userId: string): Promise<Note[]>;
   upsert(note: Note): Promise<void>;
   softDelete(note: Note): Promise<void>;
+  /** Permanent removal, used by the 30-day trash. */
+  purge?(noteId: string): Promise<void>;
   subscribe?: (
     userId: string,
     onRemoteNote: (note: Note) => void | Promise<void>,
@@ -225,3 +227,5 @@ export class SyncEngine {
     this.listeners.forEach((listener) => listener(snapshot));
   }
 }
+
+

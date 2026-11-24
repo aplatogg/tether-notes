@@ -96,7 +96,7 @@ export function NoteList({
         ) : notes.length > 0 ? (
           notes.map((note) => (
             <article
-              className={note.id === selectedId ? "note-row is-selected" : "note-row"}
+              className={[ "note-row", note.id === selectedId ? "is-selected" : "", note.deletedAt ? "is-deleted" : "" ].filter(Boolean).join(" ")}
               key={note.id}
               role="listitem"
             >
@@ -145,6 +145,7 @@ export function NoteList({
     </section>
   );
 }
+
 
 
 

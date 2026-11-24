@@ -35,6 +35,7 @@ import { countWords, markdownToHtml } from "@/lib/notes/rich";
 
 interface RichEditorProps {
   value: string;
+  readOnly?: boolean;
   onChange: (html: string) => void;
   onSaveShortcut?: () => void;
 }
@@ -189,7 +190,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps) {
+export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -207,6 +208,7 @@ export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps)
       Placeholder.configure({ placeholder: "Start writing. Use the toolbar or type / for structure." }),
     ],
     content: markdownToHtml(value),
+    editable: !readOnly,
     editorProps: {
       attributes: { class: "rich-content", spellcheck: "true" },
     },
@@ -240,7 +242,7 @@ export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps)
 
   return (
     <div className="rich-editor">
-      <Toolbar editor={editor} />
+      {readOnly ? null : <Toolbar editor={editor} />}
       <div className="rich-editor-scroll">
         <EditorContent editor={editor} />
       </div>
@@ -251,6 +253,7 @@ export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps)
     </div>
   );
 }
+
 
 
 

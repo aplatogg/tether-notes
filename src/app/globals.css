@@ -2025,3 +2025,41 @@ button:disabled {
   min-height: 120px;
   margin-top: 12px;
 }
+
+/* ---------- trash ---------- */
+.trash-banner {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--sheet-border);
+  background: #fdf3e7;
+  color: #7a4a12;
+  font-size: 12.5px;
+  gap: 10px;
+}
+
+.trash-banner span {
+  flex: 1;
+}
+
+.trash-banner button {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid #e2c9a8;
+  border-radius: 6px;
+  background: #fff;
+  color: #7a4a12;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trash-banner .danger-link {
+  border-color: transparent;
+  background: transparent;
+  color: #a3372f;
+}
+
+.note-row.is-deleted .note-row-title span:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}

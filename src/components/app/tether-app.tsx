@@ -21,6 +21,7 @@ import {
   Plus,
   Search,
   Tags,
+  Trash2,
   UserRound,
   WifiOff,
 } from "lucide-react";
@@ -144,6 +145,7 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
       all: filterNotes(notesWithDraft, { scope: "all" }).length,
       pinned: filterNotes(notesWithDraft, { scope: "pinned" }).length,
       archived: filterNotes(notesWithDraft, { scope: "archived" }).length,
+      trash: filterNotes(notesWithDraft, { scope: "trash" }).length,
     }),
     [notesWithDraft],
   );
@@ -273,6 +275,38 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
     }
   }
 
+  useEffect(() => {
+    if (workspace.isLoading) return;
+    const key = "tether-trash-purge";
+    const last = Number(window.sessionStorage.getItem(key) ?? "0");
+    if (Date.now() - last < 60 * 60 * 1000) return;
+    window.sessionStorage.setItem(key, String(Date.now()));
+    void workspace.purgeExpiredTrash();
+  }, [workspace.isLoading, workspace]);
+  async function handleRestore() {
+    if (!activeDraft) return;
+    try {
+      const restored = await workspace.restoreNote(activeDraft.id);
+      setDraft(restored);
+      setSelectedId(restored.id);
+      setIsDirty(false);
+    } catch {
+      // The workspace surfaces storage errors.
+    }
+  }
+
+  async function handleDeleteForever() {
+    if (!activeDraft) return;
+    window.confirm("Delete this note permanently? This cannot be undone.");
+    try {
+      await workspace.deleteForever(activeDraft.id);
+      setDraft(null);
+      setSelectedId(null);
+      setIsDirty(false);
+    } catch {
+      // The workspace surfaces storage errors.
+    }
+  }
   function handleScope(nextScope: NoteScope) {
     flushCurrentDraft();
     setScope(nextScope);
@@ -348,6 +382,7 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
             ["all", FileText, "All notes"],
             ["pinned", Pin, "Pinned"],
             ["archived", Archive, "Archived"],
+            ["trash", Trash2, "Trash"],
           ] as const).map(([value, Icon, label]) => (
             <button
               className={scope === value && !selectedTag ? "is-active" : undefined}
@@ -468,6 +503,8 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
             onTogglePin={handleTogglePin}
             onToggleArchive={handleToggleArchive}
             onDelete={() => void handleDelete()}
+            onRestore={() => void handleRestore()}
+            onDeleteForever={() => void handleDeleteForever()}
             onBack={() => {
               flushCurrentDraft();
               setMobilePane("list");
@@ -645,5 +682,10 @@ export function TetherApp() {
     <CloudWorkspace client={boot.client} onUseLocalMode={() => setForceLocalMode(true)} />
   );
 }
+
+
+
+
+
 
 

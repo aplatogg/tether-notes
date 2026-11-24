@@ -27,12 +27,13 @@ export interface CreateDraftNoteInput {
   lockHash?: string | null;
 }
 
-export type NoteScope = "all" | "pinned" | "archived";
+export type NoteScope = "all" | "pinned" | "archived" | "trash";
 
 export interface NoteFilter {
   scope: NoteScope;
   query?: string;
   tag?: string;
 }
+
 
 

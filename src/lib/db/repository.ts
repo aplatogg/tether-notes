@@ -303,6 +303,55 @@ export class NotesRepository {
     );
   }
 
+  /** Permanently removes a note and any queued mutation for it (used by the trash). */
+  async hardDelete(noteId: string): Promise<void> {
+    const id = z.string().min(1).parse(noteId);
+
+    await this.database.transaction("rw", this.database.notes, this.database.outbox, async () => {
+      await this.database.notes.delete(id);
+      await this.database.outbox.delete(id);
+    });
+  }
+
+  /** Restores a trashed note by clearing deleted_at and queueing the change. */
+  async restore(noteId: string): Promise<Note> {
+    const id = z.string().min(1).parse(noteId);
+    const timestamp = timestampSchema.parse(this.now());
+    const operationId = z.string().min(1).parse(this.createOperationId());
+
+    return this.database.transaction(
+      "rw",
+      this.database.notes,
+      this.database.outbox,
+      async () => {
+        const existing = await this.database.notes.get(id);
+        if (!existing) throw new Error(`Note not found: ${id}`);
+
+        const existingMutation = await this.database.outbox.get(id);
+        const restored = parseNote({
+          ...withoutSyncError(parseNote(fromStoredNote(existing))),
+          deletedAt: null,
+          updatedAt: timestamp,
+          syncStatus: "pending",
+        });
+        const mutation: OutboxMutation = {
+          noteId: restored.id,
+          userId: restored.userId,
+          kind: "upsert",
+          payload: restored,
+          operationId,
+          attempts: 0,
+          createdAt: existingMutation?.createdAt ?? timestamp,
+          updatedAt: timestamp,
+        };
+
+        await this.database.notes.put(toStoredNote(restored));
+        await this.database.outbox.put(mutation);
+
+        return restored;
+      },
+    );
+  }
   async removeMutation(noteId: string, operationId: string): Promise<boolean> {
     const id = z.string().min(1).parse(noteId);
     const expectedOperationId = z.string().min(1).parse(operationId);
@@ -403,4 +452,6 @@ export class NotesRepository {
     });
   }
 }
+
+
 

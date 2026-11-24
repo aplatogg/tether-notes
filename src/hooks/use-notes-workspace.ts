@@ -5,6 +5,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { getNotesDatabase } from "@/lib/db/database";
 import { NotesRepository } from "@/lib/db/repository";
 import { createDraftNote } from "@/lib/notes/model";
+import { selectExpired } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
 import {
   SyncEngine,
@@ -150,6 +151,40 @@ export function useNotesWorkspace(
     return saved;
   }
 
+  async function restoreNote(noteId: string): Promise<Note> {
+    const saved = await withRepository((activeRepository) => activeRepository.restore(noteId));
+    void engineRef.current?.sync();
+    return saved;
+  }
+
+  async function deleteForever(noteId: string): Promise<void> {
+    await withRepository(async (activeRepository) => {
+      if (adapter?.purge) {
+        await adapter.purge(noteId);
+      }
+      await activeRepository.hardDelete(noteId);
+    });
+  }
+
+  async function purgeExpiredTrash(): Promise<number> {
+    if (!repository) return 0;
+
+    const all = await withRepository((activeRepository) => activeRepository.list(userId));
+    const expired = selectExpired(all);
+    let removed = 0;
+
+    for (const note of expired) {
+      try {
+        if (adapter?.purge) await adapter.purge(note.id);
+        await repository.hardDelete(note.id);
+        removed += 1;
+      } catch {
+        // Keep the note when the remote purge fails so nothing is lost silently.
+      }
+    }
+
+    return removed;
+  }
   return {
     notes,
     isLoading: repository === null || notes === undefined,
@@ -161,7 +196,11 @@ export function useNotesWorkspace(
     createNote,
     saveNote,
     deleteNote,
+    restoreNote,
+    deleteForever,
+    purgeExpiredTrash,
     retrySync: () => engineRef.current?.sync() ?? Promise.resolve(),
     clearStorageError: () => setStorageError(null),
   };
 }
+

@@ -18,6 +18,7 @@ import {
 import { RichEditor } from "@/components/notes/rich-editor";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
 import { normalizeTags } from "@/lib/notes/model";
+import { trashDaysLeft } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createShareLink, revokeShareLink } from "@/lib/supabase/share";
@@ -31,6 +32,8 @@ interface NoteEditorProps {
   onTogglePin: () => void;
   onToggleArchive: () => void;
   onDelete: () => void;
+  onRestore: () => void;
+  onDeleteForever: () => void;
   onBack: () => void;
   onCreate: () => void;
   hiddenOnMobile: boolean;
@@ -54,6 +57,8 @@ export function NoteEditor({
   onTogglePin,
   onToggleArchive,
   onDelete,
+  onRestore,
+  onDeleteForever,
   onBack,
   onCreate,
   hiddenOnMobile,
@@ -196,6 +201,15 @@ export function NoteEditor({
             </div>
           </header>
 
+          {note.deletedAt ? (
+            <div className="trash-banner" role="status">
+              <span>
+                In trash · deleted {trashDaysLeft(note) <= 0 ? "today" : `${trashDaysLeft(note)} days left`}
+              </span>
+              <button type="button" onClick={onRestore}>Restore</button>
+              <button type="button" className="danger-link" onClick={onDeleteForever}>Delete forever</button>
+            </div>
+          ) : null}
           {note.isArchived ? (
             <div className="archive-notice">
               This note is archived.
@@ -262,6 +276,7 @@ export function NoteEditor({
                   id="note-title"
                   className="title-input"
                   defaultValue={note.title}
+                  readOnly={note.deletedAt !== null}
                   onChange={(event) => onChange({ title: event.target.value })}
                   placeholder="Untitled note"
                   autoComplete="off"
@@ -269,6 +284,7 @@ export function NoteEditor({
                 />
                 <RichEditor
                   key={note.id}
+                  readOnly={note.deletedAt !== null}
                   value={note.body}
                   onChange={(html) => onChange({ body: html })}
                   onSaveShortcut={onSave}
@@ -344,5 +360,6 @@ export function NoteEditor({
     </section>
   );
 }
+
 
 

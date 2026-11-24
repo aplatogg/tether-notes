@@ -94,6 +94,11 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
     upsert: write,
     softDelete: write,
 
+    async purge(noteId) {
+      const { error } = await client.from("notes").delete().eq("id", noteId);
+      throwIfError(error);
+    },
+
     subscribe(userId, onRemoteNote, onError) {
       const channel = client
         .channel(`notes:${userId}:${globalThis.crypto.randomUUID()}`)
@@ -129,6 +134,7 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
     },
   };
 }
+
 
 
 

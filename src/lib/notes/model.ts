@@ -216,8 +216,16 @@ export function matchesSearch(note: Note, query: string): boolean {
 
 export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] {
   const selectedTag = filter.tag === undefined ? "" : normalizeTag(filter.tag);
+  const query = normalizeSearchText(filter.query ?? "").trim();
 
   return notes.filter((note) => {
+    if (filter.scope === "trash") {
+      if (note.deletedAt === null) return false;
+      if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) return false;
+      if (query.length === 0) return true;
+      return normalizeSearchText(note.title).includes(query);
+    }
+
     if (note.deletedAt !== null) {
       return false;
     }
@@ -277,6 +285,8 @@ export function sortNotes(notes: readonly Note[]): Note[] {
     })
     .map(({ note }) => note);
 }
+
+
 
 
 
