@@ -85,6 +85,57 @@ export function remoteRowToNote(value: unknown, currentUserId?: string): Note {
   };
 }
 
+/**
+ * Maps a row from the granted_notes() RPC. The server masks body and lock_hash
+ * for locked notes; is_locked is carried as a truthy lockHash marker so the UI
+ * shows the lock without ever seeing the real hash (shared notes are read-only,
+ * so the marker is never written back).
+ */
+export function grantedRowToNote(value: unknown, currentUserId?: string): Note {
+  const row = z
+    .object({
+      id: z.uuid(),
+      user_id: z.uuid(),
+      title: z.string(),
+      body: z.string().nullable(),
+      tags: z.array(z.string()),
+      is_pinned: z.boolean(),
+      is_archived: z.boolean(),
+      is_locked: z.boolean(),
+      reminder_at: timestampSchema.nullable().optional(),
+      folder: z.string().optional(),
+      workspace_id: z.uuid().nullable().optional(),
+      deleted_at: timestampSchema.nullable(),
+      created_at: timestampSchema,
+      updated_at: timestampSchema,
+    })
+    .strict()
+    .parse(value);
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    body: row.body ?? "",
+    tags: [...row.tags],
+    isPinned: row.is_pinned,
+    isArchived: row.is_archived,
+    lockHash: row.is_locked ? "locked" : null,
+    reminderAt: row.reminder_at ?? null,
+    folder: row.folder ?? "",
+    workspaceId: row.workspace_id ?? null,
+    deletedAt: row.deleted_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    syncStatus: "synced",
+    lastSyncError: undefined,
+    shared: true,
+    sharedFor: currentUserId ?? null,
+    ownerEmail: null,
+    shareGroup: null,
+  };
+}
+
 interface ShareMeta {
   ownerEmailByNote: Map<string, string>;
   groupByNote: Map<string, string>;
@@ -122,19 +173,30 @@ function applyShareMeta(note: Note, meta: ShareMeta): Note {
 }
 
 async function pullNotes(client: SupabaseClient, userId: string): Promise<Note[]> {
-  // RLS returns our own notes plus notes shared with us and workspace notes; no user_id filter.
-  const { data, error } = await client
-    .from("notes")
-    .select(
-      "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,reminder_at,folder,workspace_id,deleted_at,created_at,updated_at",
-    )
-    .order("updated_at", { ascending: true });
+  // Own + workspace notes come from the table (RLS); grant-shared notes come from
+  // granted_notes(), which masks locked bodies/lock hashes server-side.
+  const [ownRes, grantedRes, meta] = await Promise.all([
+    client
+      .from("notes")
+      .select(
+        "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,reminder_at,folder,workspace_id,deleted_at,created_at,updated_at",
+      )
+      .order("updated_at", { ascending: true }),
+    client.rpc("granted_notes"),
+    fetchShareMeta(client),
+  ]);
 
-  throwIfError(error);
+  throwIfError(ownRes.error);
+  throwIfError(grantedRes.error);
 
-  const meta = await fetchShareMeta(client);
+  const own = (ownRes.data ?? []).map((row) =>
+    applyShareMeta(remoteRowToNote(row, userId), meta),
+  );
+  const granted = (grantedRes.data ?? []).map((row) =>
+    applyShareMeta(grantedRowToNote(row, userId), meta),
+  );
 
-  return (data ?? []).map((row) => applyShareMeta(remoteRowToNote(row, userId), meta));
+  return [...own, ...granted];
 }
 
 export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {

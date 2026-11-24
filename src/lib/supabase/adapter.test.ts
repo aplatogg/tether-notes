@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Note } from "@/lib/notes/types";
-import { noteToRemoteRow, remoteRowToNote } from "./adapter";
+import { grantedRowToNote, noteToRemoteRow, remoteRowToNote } from "./adapter";
 
 const note: Note = {
   id: "1c622c7e-6c1d-47d9-a98f-d8c4c8a13247",
@@ -75,6 +75,25 @@ describe("Supabase note mapping", () => {
     expect(() =>
       remoteRowToNote({ ...noteToRemoteRow(note), tags: "not-an-array" }),
     ).toThrow();
+  });
+
+  test("granted_notes rows are masked: locked body stays empty, lock hash never leaks", () => {
+    const base = noteToRemoteRow(note);
+    const unlocked = grantedRowToNote(
+      { ...base, body: "shared body", is_locked: false },
+      "current-user",
+    );
+    expect(unlocked.shared).toBe(true);
+    expect(unlocked.sharedFor).toBe("current-user");
+    expect(unlocked.body).toBe("shared body");
+    expect(unlocked.lockHash).toBeNull();
+
+    const locked = grantedRowToNote(
+      { ...base, body: null, is_locked: true },
+      "current-user",
+    );
+    expect(locked.body).toBe("");
+    expect(locked.lockHash).toBe("locked");
   });
 });
 
