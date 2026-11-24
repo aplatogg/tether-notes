@@ -12,6 +12,44 @@ export interface WorkspaceMember {
   role: string;
 }
 
+export interface WorkspaceInvite {
+  workspaceId: string;
+  name: string;
+  inviterEmail: string;
+}
+
+export async function listMyInvites(client: SupabaseClient): Promise<WorkspaceInvite[]> {
+  const { data, error } = await client.rpc("my_workspace_invites");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(
+    (row: { workspace_id: string; name: string; inviter_email: string }) => ({
+      workspaceId: row.workspace_id,
+      name: row.name,
+      inviterEmail: row.inviter_email,
+    }),
+  );
+}
+
+export async function acceptWorkspaceInvite(
+  client: SupabaseClient,
+  workspaceId: string,
+): Promise<void> {
+  const { error } = await client.rpc("accept_workspace_invite", {
+    p_workspace_id: workspaceId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function declineWorkspaceInvite(
+  client: SupabaseClient,
+  workspaceId: string,
+): Promise<void> {
+  const { error } = await client.rpc("decline_workspace_invite", {
+    p_workspace_id: workspaceId,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function listMyWorkspaces(client: SupabaseClient): Promise<Workspace[]> {
   const { data, error } = await client.rpc("my_workspaces");
   if (error) throw new Error(error.message);

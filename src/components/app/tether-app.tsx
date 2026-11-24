@@ -67,13 +67,17 @@ import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { setSharedNoteGroup, setShareAutogroup } from "@/lib/supabase/sharing";
 import {
+  acceptWorkspaceInvite,
   createWorkspace,
+  declineWorkspaceInvite,
   inviteWorkspaceMember,
   leaveWorkspace,
+  listMyInvites,
   listMyWorkspaces,
   listWorkspaceMembers,
   removeWorkspaceMember,
   type Workspace,
+  type WorkspaceInvite,
   type WorkspaceMember,
 } from "@/lib/supabase/workspaces";
 import type { SyncAdapter, SyncEngineState } from "@/lib/sync/engine";
@@ -159,6 +163,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupError, setNewGroupError] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
@@ -243,18 +248,49 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     [notesWithDraft],
   );
 
+  async function refreshWorkspaces() {
+    if (!client) return;
+    try {
+      const [list, inviteList] = await Promise.all([
+        listMyWorkspaces(client),
+        listMyInvites(client),
+      ]);
+      setWorkspaces(list);
+      setInvites(inviteList);
+    } catch {
+      // surfaced via workspaceError when relevant
+    }
+  }
+
   useEffect(() => {
     if (!client || !userId) return;
-    let active = true;
-    void listMyWorkspaces(client)
-      .then((list) => {
-        if (active) setWorkspaces(list);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    const timer = window.setTimeout(() => void refreshWorkspaces(), 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, userId]);
+
+  async function handleAcceptInvite(invite: WorkspaceInvite) {
+    if (!client) return;
+    setWorkspaceError(null);
+    try {
+      await acceptWorkspaceInvite(client, invite.workspaceId);
+      await refreshWorkspaces();
+      setSelectedWorkspace(invite.workspaceId);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleDeclineInvite(invite: WorkspaceInvite) {
+    if (!client) return;
+    setWorkspaceError(null);
+    try {
+      await declineWorkspaceInvite(client, invite.workspaceId);
+      await refreshWorkspaces();
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    }
+  }
 
   const shareGroups = useMemo(() => collectShareGroups(notesWithDraft), [notesWithDraft]);
 
@@ -685,6 +721,37 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           New note
           <kbd>⌘ N</kbd>
         </button>
+
+        {client && userId && invites.length > 0 ? (
+          <div className="sidebar-tags">
+            <p><Bell aria-hidden="true" /> Invitations</p>
+            {invites.map((invite) => (
+              <div className="workspace-row" key={invite.workspaceId}>
+                <button type="button" title={`Invited by ${invite.inviterEmail}`} disabled>
+                  <span>{invite.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="workspace-manage"
+                  aria-label={`Accept invite to ${invite.name}`}
+                  title="Accept"
+                  onClick={() => void handleAcceptInvite(invite)}
+                >
+                  <Check aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="workspace-manage"
+                  aria-label={`Decline invite to ${invite.name}`}
+                  title="Decline"
+                  onClick={() => void handleDeclineInvite(invite)}
+                >
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {client && userId ? (
           <div className="sidebar-tags">
