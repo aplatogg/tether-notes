@@ -24,6 +24,7 @@ Tether Notes is an installable local-first notes app. Notes are written to Index
 - Local-only mode when public Supabase configuration is absent.
 - Responsive desktop list/editor and single-pane mobile navigation.
 - Installable PWA shell with an offline navigation fallback.
+- Mobile: add to Home Screen (Android Chrome "Install app", iPhone Safari Share → "Add to Home Screen"). Android can share text straight into the app via the system share sheet (Web Share Target → `/mini`). iPhone: build a Shortcut that opens `https://tethernotes.me/mini?text=<input>&save=1`.
 - Keyboard shortcuts: `Ctrl/Cmd+N`, `Ctrl/Cmd+K`, `Ctrl/Cmd+S`, and `Escape`.
 
 ## Requirements

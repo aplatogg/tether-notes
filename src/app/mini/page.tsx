@@ -5,6 +5,7 @@ import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { ArrowUpRight, Check, LoaderCircle } from "lucide-react";
 import { useNotesWorkspace } from "@/hooks/use-notes-workspace";
 import { displayTitle } from "@/lib/notes/model";
+import { miniPrefillFromSearch } from "@/lib/notes/mini";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -42,6 +43,18 @@ function MiniWorkspace({ userId, client }: { userId: string | null; client: Supa
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoSaveRef = useRef(false);
+
+  // Prefill from share sheet / iOS Shortcut query params (?title=&text=&url=&save=1).
+  useEffect(() => {
+    queueMicrotask(() => {
+      const prefill = miniPrefillFromSearch(window.location.search);
+      if (prefill.text) {
+        setText(prefill.text);
+        autoSaveRef.current = prefill.autoSave;
+      }
+    });
+  }, []);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -75,6 +88,15 @@ function MiniWorkspace({ userId, client }: { userId: string | null; client: Supa
       setSaving(false);
     }
   }
+
+  // Auto-save once the local store is ready (shortcut flow with save=1).
+  useEffect(() => {
+    if (autoSaveRef.current && !workspace.isLoading && text.trim()) {
+      autoSaveRef.current = false;
+      void save();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace.isLoading, text]);
 
   return (
     <div className="mini-shell">
