@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getNotesDatabase } from "@/lib/db/database";
 import { NotesRepository } from "@/lib/db/repository";
@@ -79,27 +79,48 @@ export function useNotesWorkspace(
 
   // In Supabase mode the server is the display source of truth: re-pull after
   // every sync so the UI always shows server state, never a stale local cache.
+  // Pulls are coalesced (debounce + single flight) because one save produces a
+  // sync tick plus a realtime echo — without this each edit cost two full pulls.
   // Local-only mode (no adapter) keeps using IndexedDB directly.
   const [serverNotes, setServerNotes] = useState<Note[] | null>(null);
+  const pullControl = useRef({ timer: 0, running: false, pending: false });
+
+  const refreshFromServer = useEffectEvent(async () => {
+    if (!adapter || !repository || userId === null) return;
+
+    if (pullControl.current.running) {
+      pullControl.current.pending = true;
+      return;
+    }
+
+    pullControl.current.running = true;
+    try {
+      const pulled = await adapter.pull(userId);
+      setServerNotes(
+        [...pulled].sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        ),
+      );
+    } catch {
+      // Offline or pull failed: keep showing the local cache.
+    } finally {
+      pullControl.current.running = false;
+      if (pullControl.current.pending) {
+        pullControl.current.pending = false;
+        await refreshFromServer();
+      }
+    }
+  });
+
   useEffect(() => {
     if (!adapter || !repository || userId === null) return;
-    let active = true;
-    adapter
-      .pull(userId)
-      .then((pulled) => {
-        if (active) {
-          setServerNotes(
-            [...pulled].sort(
-              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-            ),
-          );
-        }
-      })
-      .catch(() => {
-        // Offline or pull failed: keep showing the local cache.
-      });
+    const control = pullControl.current;
+    if (control.timer) window.clearTimeout(control.timer);
+    control.timer = window.setTimeout(() => {
+      void refreshFromServer();
+    }, 250);
     return () => {
-      active = false;
+      if (control.timer) window.clearTimeout(control.timer);
     };
   }, [adapter, repository, userId, syncTick]);
 
