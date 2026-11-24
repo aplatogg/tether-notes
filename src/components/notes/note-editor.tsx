@@ -110,9 +110,8 @@ export function NoteEditor({
     onChange({ body: result.body });
 
     if (textarea) {
-      textarea.value = result.body;
       textarea.focus();
-      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+      applyResult(textarea, result);
     }
   }
 
@@ -120,13 +119,42 @@ export function NoteEditor({
     applyEdit((body, start, end) => applyBlockStyle(body, start, end, type));
   }
 
+  /**
+   * Applies a programmatic edit through execCommand so the browser keeps a real
+   * undo stack; direct `textarea.value = ...` would wipe Ctrl+Z history.
+   */
   function applyResult(
     textarea: HTMLTextAreaElement,
     result: { body: string; selectionStart: number; selectionEnd: number },
   ) {
-    textarea.value = result.body;
-    onChange({ body: result.body });
+    const previous = textarea.value;
+
+    if (previous !== result.body && typeof document.execCommand === "function") {
+      let start = 0;
+      while (start < previous.length && start < result.body.length && previous[start] === result.body[start]) {
+        start += 1;
+      }
+
+      let tail = 0;
+      while (
+        tail < previous.length - start &&
+        tail < result.body.length - start &&
+        previous[previous.length - 1 - tail] === result.body[result.body.length - 1 - tail]
+      ) {
+        tail += 1;
+      }
+
+      const end = previous.length - tail;
+      const inserted = result.body.slice(start, result.body.length - tail);
+      const applied = document.execCommand("insertText", false, inserted);
+
+      if (!applied) {
+        textarea.setRangeText(inserted, start, end, "end");
+      }
+    }
+
     textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+    onChange({ body: textarea.value });
   }
 
   function handleBodyKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -513,6 +541,7 @@ export function NoteEditor({
     </section>
   );
 }
+
 
 
 
