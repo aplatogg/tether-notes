@@ -23,7 +23,7 @@ describe("parseBlocks", () => {
   });
 
   it("keeps unknown lines as paragraphs with their original text", () => {
-    expect(parseBlocks("plain text")[0]).toEqual({ type: "paragraph", text: "plain text" });
+    expect(parseBlocks("plain text")[0]).toMatchObject({ type: "paragraph", text: "plain text", depth: 0 });
   });
 });
 
@@ -98,3 +98,4 @@ describe("toggleChecklistLine", () => {
     expect(toggleChecklistLine("- [ ] task", 5)).toBe("- [ ] task");
   });
 });
+

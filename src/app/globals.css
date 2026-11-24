@@ -933,19 +933,14 @@ button:disabled {
   list-style: none;
 }
 
-.note-ordered {
-  counter-reset: note-ordered;
-}
-
 .note-ordered li {
-  counter-increment: note-ordered;
   display: flex;
   gap: 9px;
   padding: 2px 0;
 }
 
 .note-ordered li::before {
-  content: counter(note-ordered) ".";
+  content: attr(data-index) ".";
   min-width: 18px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -1849,3 +1844,4 @@ button:disabled {
   color: #8a6a12;
   font-size: 10px;
 }
+

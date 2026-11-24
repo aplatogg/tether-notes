@@ -26,7 +26,16 @@ import {
   Type,
 } from "lucide-react";
 import { NoteBody } from "@/components/notes/note-body";
-import { checklistProgress, applyBlockStyle, applyCodeBlock, applyInlineStyle, toggleChecklistLine } from "@/lib/notes/format";
+import {
+  applyBlockStyle,
+  applyCodeBlock,
+  applyInlineStyle,
+  checklistProgress,
+  continueList,
+  indentOf,
+  indentSelection,
+  toggleChecklistLine,
+} from "@/lib/notes/format";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
 import { normalizeTags } from "@/lib/notes/model";
 import type { Note } from "@/lib/notes/types";
@@ -111,6 +120,48 @@ export function NoteEditor({
     applyEdit((body, start, end) => applyBlockStyle(body, start, end, type));
   }
 
+  function applyResult(
+    textarea: HTMLTextAreaElement,
+    result: { body: string; selectionStart: number; selectionEnd: number },
+  ) {
+    textarea.value = result.body;
+    onChange({ body: result.body });
+    textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+  }
+
+  function handleBodyKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const textarea = event.currentTarget;
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const result = indentSelection(
+        textarea.value,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        event.shiftKey ? -1 : 1,
+      );
+      applyResult(textarea, result);
+      return;
+    }
+
+    if (event.key === "Enter" && !event.shiftKey) {
+      const result = continueList(textarea.value, textarea.selectionStart);
+      if (!result) return;
+      event.preventDefault();
+      applyResult(textarea, result);
+      return;
+    }
+
+    if (event.key === "Backspace" && textarea.selectionStart === textarea.selectionEnd) {
+      const caret = textarea.selectionStart;
+      const lineStart = textarea.value.lastIndexOf("\n", Math.max(0, caret - 1)) + 1;
+      const prefix = textarea.value.slice(lineStart, caret);
+      if (/^ +$/.test(prefix) && indentOf(prefix) > 0) {
+        event.preventDefault();
+        applyResult(textarea, indentSelection(textarea.value, caret, caret, -1));
+      }
+    }
+  }
   async function openPinModal(next: "set" | "unlock" | "remove") {
     setPin("");
     setPinError(null);
@@ -382,6 +433,7 @@ export function NoteEditor({
                       className="body-input"
                       defaultValue={note.body}
                       onChange={(event) => onChange({ body: event.target.value })}
+                      onKeyDown={handleBodyKeyDown}
                       placeholder="Start writing. H heading, H2 subheading, lists, checklists, **bold**, `code`, and ``` code blocks."
                     />
                   </>
@@ -461,6 +513,8 @@ export function NoteEditor({
     </section>
   );
 }
+
+
 
 
 

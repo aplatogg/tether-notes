@@ -31,10 +31,19 @@ export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
     if (!listType || items.length === 0) return;
 
     if (listType === "ordered") {
+      const counters: number[] = [];
+      const numbered = items.map(({ block, index }) => {
+        const depth = block.depth ?? 0;
+        counters[depth] = (counters[depth] ?? 0) + 1;
+        for (let deeper = depth + 1; deeper < counters.length; deeper += 1) counters[deeper] = 0;
+        return { block, index, number: counters[depth] };
+      });
       nodes.push(
         <ol key={`ol-${items[0].index}`} className="note-ordered">
-          {items.map(({ block, index }) => (
-            <li key={index}><InlineText text={block.text || "\u00A0"} /></li>
+          {numbered.map(({ block, index, number }) => (
+            <li key={index} data-index={number} style={{ paddingLeft: (block.depth ?? 0) * 20 }}>
+              <InlineText text={block.text || "\u00A0"} />
+            </li>
           ))}
         </ol>,
       );
@@ -48,7 +57,7 @@ export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
             const interactive = listType === "checklist" && typeof onToggleChecklist === "function";
 
             return (
-              <li key={index}>
+              <li key={index} style={{ paddingLeft: (block.depth ?? 0) * 20 }}>
                 {listType === "checklist" ? (
                   <button
                     type="button"
@@ -113,3 +122,4 @@ export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
   flush();
   return <div className="note-preview">{nodes}</div>;
 }
+

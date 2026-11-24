@@ -45,6 +45,8 @@ export interface NoteBlock {
   number?: number;
   /** Fenced code language hint. */
   language?: string;
+  /** Nesting level derived from leading spaces. */
+  depth?: number;
 }
 
 const HEADING = /^#\s+(.*)$/;
@@ -54,29 +56,41 @@ const BULLET = /^[-*]\s+(.*)$/;
 const ORDERED = /^(\d{1,3})[.)]\s+(.*)$/;
 const FENCE = /^```([A-Za-z0-9+#._-]*)\s*$/;
 
+export function indentOf(line: string): number {
+  const match = /^(\s*)/.exec(line);
+  if (!match) return 0;
+  return Math.min(3, Math.floor(match[1].replace(/\t/g, "  ").length / 2));
+}
+
 export function parseLine(line: string): NoteBlock {
-  const heading = HEADING.exec(line);
-  if (heading) return { type: "heading", text: heading[1] };
+  const depth = indentOf(line);
+  const content = line.replace(/^[ \t]*/, "");
 
-  const subheading = SUBHEADING.exec(line);
-  if (subheading) return { type: "subheading", text: subheading[1] };
+  const heading = HEADING.exec(content);
+  if (heading) return { type: "heading", text: heading[1], depth: 0 };
 
-  const checklist = CHECKLIST.exec(line);
+  const subheading = SUBHEADING.exec(content);
+  if (subheading) return { type: "subheading", text: subheading[1], depth: 0 };
+
+  const checklist = CHECKLIST.exec(content);
   if (checklist) {
     return {
       type: "checklist",
       text: checklist[2],
       checked: checklist[1].toLowerCase() === "x",
+      depth,
     };
   }
 
-  const bullet = BULLET.exec(line);
-  if (bullet) return { type: "bullet", text: bullet[1] };
+  const bullet = BULLET.exec(content);
+  if (bullet) return { type: "bullet", text: bullet[1], depth };
 
-  const ordered = ORDERED.exec(line);
-  if (ordered) return { type: "ordered", text: ordered[2], number: Number(ordered[1]) };
+  const ordered = ORDERED.exec(content);
+  if (ordered) {
+    return { type: "ordered", text: ordered[2], number: Number(ordered[1]), depth };
+  }
 
-  return { type: "paragraph", text: line };
+  return { type: "paragraph", text: content, depth };
 }
 
 export function parseBlocks(body: string): NoteBlock[] {
@@ -312,3 +326,90 @@ export function checklistProgress(body: string): { done: number; total: number }
 export function hasBlocks(body: string): boolean {
   return body.split(/\r?\n/).some((line) => parseLine(line).type !== "paragraph" || FENCE.test(line));
 }
+
+
+
+const LIST_TYPES: readonly BlockType[] = ["bullet", "ordered", "checklist"];
+
+function lineBounds(body: string, offset: number): { start: number; end: number } {
+  const start = body.lastIndexOf("\n", Math.max(0, offset - 1)) + 1;
+  const newline = body.indexOf("\n", offset);
+  return { start, end: newline === -1 ? body.length : newline };
+}
+
+/** Indents or outdents the selected lines by one level (two spaces). */
+export function indentSelection(
+  body: string,
+  selectionStart: number,
+  selectionEnd: number,
+  direction: 1 | -1,
+): FormatResult {
+  const first = lineBounds(body, selectionStart);
+  const last = lineBounds(body, selectionEnd);
+  const block = body.slice(first.start, last.end);
+  let firstDelta = 0;
+  let totalDelta = 0;
+
+  const lines = block.split("\n").map((line, index) => {
+    const depth = indentOf(line);
+    const content = line.replace(/^[ \t]*/, "");
+    const nextDepth = Math.max(0, Math.min(3, depth + direction));
+    const rebuilt = `${"  ".repeat(nextDepth)}${content}`;
+    const delta = rebuilt.length - line.length;
+    if (index === 0) firstDelta = delta;
+    totalDelta += delta;
+    return rebuilt;
+  });
+
+  const nextBody = `${body.slice(0, first.start)}${lines.join("\n")}${body.slice(last.end)}`;
+  return {
+    body: nextBody,
+    selectionStart: Math.max(first.start, selectionStart + firstDelta),
+    selectionEnd: Math.max(first.start, selectionEnd + totalDelta),
+  };
+}
+
+/** Continues a bullet/numbered/checklist item on Enter, or exits an empty item. */
+export function continueList(body: string, caret: number): FormatResult | null {
+  const current = lineBounds(body, caret);
+  const line = body.slice(current.start, current.end);
+  const block = parseLine(line);
+
+  if (!LIST_TYPES.includes(block.type)) return null;
+
+  const depth = indentOf(line);
+  const content = block.text.trim();
+  const indent = "  ".repeat(depth);
+
+  if (content.length === 0) {
+    const nextBody = `${body.slice(0, current.start)}${indent}${body.slice(current.end)}`;
+    return { body: nextBody, selectionStart: current.start + indent.length, selectionEnd: current.start + indent.length };
+  }
+
+  let marker = "- ";
+  if (block.type === "checklist") marker = "- [ ] ";
+  if (block.type === "ordered") {
+    const lines = body.slice(0, current.start).split(/\r?\n/);
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    lines.push(line);
+
+    let count = 0;
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const candidate = lines[index];
+      const previous = parseLine(candidate);
+      if (previous.type !== "ordered") break;
+      const candidateDepth = indentOf(candidate);
+      if (candidateDepth < depth) break;
+      if (candidateDepth === depth) count += 1;
+    }
+    marker = `${count + 1}. `;
+  }
+
+  const insertion = `\n${indent}${marker}`;
+  const nextBody = `${body.slice(0, current.end)}${insertion}${body.slice(current.end)}`;
+  const nextCaret = current.end + insertion.length;
+
+  return { body: nextBody, selectionStart: nextCaret, selectionEnd: nextCaret };
+}
+
+
