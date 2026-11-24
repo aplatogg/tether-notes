@@ -109,7 +109,7 @@ export function FolderInput({
         list="note-folders"
         defaultValue={note.folder ?? ""}
         key={`folder-${note.id}`}
-        placeholder="Folder (optional)"
+        placeholder="Group (optional, e.g. General, Kerja/Q4)"
         readOnly={readOnly}
         maxLength={60}
         onBlur={(event) => onChange({ folder: event.target.value.trim() })}

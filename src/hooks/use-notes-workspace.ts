@@ -81,6 +81,15 @@ export function useNotesWorkspace(
     return (await repository.listOutbox(userId)).length;
   }, [repository, userId], 0);
 
+  /** User-created groups that exist even before any note is filed into them. */
+  const customFolders = useLiveQuery(async () => {
+    if (!repository) {
+      return [] as string[];
+    }
+
+    return (await repository.getMetadata<string[]>("custom-folders")) ?? [];
+  }, [repository], [] as string[]);
+
   useEffect(() => {
     if (!repository) {
       return;
@@ -158,6 +167,19 @@ export function useNotesWorkspace(
   }
 
   /** Updates the recipient-side group label locally (server side goes through an RPC). */
+  async function addCustomFolder(name: string): Promise<string[]> {
+    const trimmed = name.trim().replace(/\/+/gu, "/").replace(/^\/|\/$/gu, "");
+    if (!trimmed) throw new Error("Group name cannot be empty");
+
+    return withRepository(async (activeRepository) => {
+      const current = (await activeRepository.getMetadata<string[]>("custom-folders")) ?? [];
+      if (current.includes(trimmed)) return current;
+      const next = [...current, trimmed].sort((left, right) => left.localeCompare(right));
+      await activeRepository.setMetadata("custom-folders", next);
+      return next;
+    });
+  }
+
   async function setShareGroup(noteId: string, group: string | null): Promise<Note> {
     return withRepository((activeRepository) =>
       activeRepository.setLocalShareGroup(noteId, group),
@@ -194,6 +216,8 @@ export function useNotesWorkspace(
   }
   return {
     notes,
+    customFolders,
+    addCustomFolder,
     isLoading: repository === null || notes === undefined,
     storageError,
     syncState:

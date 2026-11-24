@@ -35,9 +35,14 @@ import { AuthPanel } from "@/components/auth/auth-panel";
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
 import {
+  DEFAULT_GROUP,
   collectFolders,
   collectShareGroups,
   filterNotes,
+  folderDepth,
+  folderLabel,
+  folderTreeCounts,
+  mergeFolders,
   normalizeTags,
   sortNotes,
 } from "@/lib/notes/model";
@@ -138,6 +143,9 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [selectedShareGroup, setSelectedShareGroup] = useState<string | null>(null);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupError, setNewGroupError] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -169,15 +177,24 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           scope,
           query,
           tag: selectedTag ?? undefined,
-          folder: selectedFolder ?? undefined,
+          folder: effectiveFolder ?? undefined,
           day: calendarDay ?? undefined,
           shareGroup: scope === "shared" ? (selectedShareGroup ?? undefined) : undefined,
         }),
       ),
-    [notesWithDraft, query, scope, selectedTag, selectedFolder, calendarDay, selectedShareGroup],
+    [notesWithDraft, query, scope, selectedTag, effectiveFolder, calendarDay, selectedShareGroup],
   );
 
-  const folders = useMemo(() => collectFolders(notesWithDraft), [notesWithDraft]);
+  const folders = useMemo(
+    () => mergeFolders(collectFolders(notesWithDraft), workspace.customFolders ?? []),
+    [notesWithDraft, workspace.customFolders],
+  );
+
+  // Default view: the user's own "General" group, unless the user cleared the filter.
+  const [folderCleared, setFolderCleared] = useState(false);
+  const effectiveFolder =
+    selectedFolder ??
+    (folderCleared || scope !== "all" || !folders.includes(DEFAULT_GROUP) ? null : DEFAULT_GROUP);
 
   const shareGroups = useMemo(() => collectShareGroups(notesWithDraft), [notesWithDraft]);
 
@@ -191,15 +208,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     return totals;
   }, [notesWithDraft]);
 
-  const folderCounts = useMemo(() => {
-    const totals = new Map<string, number>();
-    notesWithDraft.forEach((note) => {
-      if (note.deletedAt !== null) return;
-      const folder = (note.folder ?? "").trim();
-      if (folder) totals.set(folder, (totals.get(folder) ?? 0) + 1);
-    });
-    return totals;
-  }, [notesWithDraft]);
+  const folderCounts = useMemo(() => folderTreeCounts(notesWithDraft), [notesWithDraft]);
 
   const counts = useMemo(
     () => ({
@@ -263,7 +272,11 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     flushCurrentDraft();
 
     try {
-      const note = await workspace.createNote();
+      let note = await workspace.createNote();
+      // New notes land in the user's default "General" group.
+      if (!note.folder?.trim()) {
+        note = await workspace.saveNote({ ...note, folder: DEFAULT_GROUP });
+      }
       draftRevision.current += 1;
       setSelectedId(note.id);
       setDraft(note);
@@ -387,8 +400,26 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
 
   function handleFolderSelect(folder: string) {
     setSelectedFolder(folder || null);
+    setFolderCleared(!folder);
     setMobilePane("list");
     setNavOpen(false);
+  }
+
+  async function handleCreateGroup() {
+    const name = newGroupName.trim();
+    if (!name) {
+      setNewGroupError("Name the group first (e.g. Kerja or Kerja/Q4).");
+      return;
+    }
+    try {
+      await workspace.addCustomFolder(name);
+      setCreatingGroup(false);
+      setNewGroupName("");
+      setNewGroupError(null);
+      handleFolderSelect(name);
+    } catch (error) {
+      setNewGroupError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   function handleShareGroupSelect(group: string) {
@@ -558,22 +589,61 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           )}
         </div>
 
-        {folders.length > 0 ? (
-          <div className="sidebar-tags">
-            <p><Folder aria-hidden="true" /> Folders</p>
-            {folders.slice(0, 10).map((folder) => (
+        <div className="sidebar-tags">
+          <p>
+            <Folder aria-hidden="true" /> Groups
+            <button
+              type="button"
+              className="new-group-button"
+              aria-label="New group"
+              title="New group (use / for sub-groups, e.g. Kerja/Q4)"
+              onClick={() => {
+                setCreatingGroup((value) => !value);
+                setNewGroupName("");
+                setNewGroupError(null);
+              }}
+            >
+              +
+            </button>
+          </p>
+          {creatingGroup ? (
+            <form
+              className="new-group-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateGroup();
+              }}
+            >
+              <input
+                type="text"
+                aria-label="New group name"
+                placeholder="Kerja/Q4"
+                maxLength={60}
+                autoFocus
+                value={newGroupName}
+                onChange={(event) => setNewGroupName(event.target.value)}
+              />
+              {newGroupError ? <p className="form-error" role="alert">{newGroupError}</p> : null}
+            </form>
+          ) : null}
+          {folders.length > 0 ? (
+            folders.slice(0, 24).map((folder) => (
               <button
-                className={selectedFolder === folder ? "is-active" : undefined}
+                className={effectiveFolder === folder ? "is-active" : undefined}
                 type="button"
                 key={folder}
+                style={{ paddingLeft: `${10 + folderDepth(folder) * 14}px` }}
+                title={folder}
                 onClick={() => handleFolderSelect(folder)}
               >
-                <span>{folder}</span>
+                <span>{folderLabel(folder)}</span>
                 <span className="num">{folderCounts.get(folder) ?? 0}</span>
               </button>
-            ))}
-          </div>
-        ) : null}
+            ))
+          ) : (
+            <span className="tags-empty">Create a group to file notes into.</span>
+          )}
+        </div>
 
         {shareGroups.length > 0 ? (
           <div className="sidebar-tags">
@@ -700,7 +770,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
               query={query}
               scope={scope}
               selectedTag={selectedTag}
-              selectedFolder={selectedFolder}
+              selectedFolder={effectiveFolder}
               showCalendar={showCalendar}
               calendarDay={calendarDay}
               calendarNotes={notesWithDraft}

@@ -2,6 +2,9 @@ import { stripBlockPrefix } from "./format";
 import { bodyToPlainText, isHtmlBody } from "./rich";
 import type { CreateDraftNoteInput, Note, NoteFilter } from "./types";
 
+/** New notes land in this group by default, and it is the default list view. */
+export const DEFAULT_GROUP = "General";
+
 const MAX_DISPLAY_TITLE_LENGTH = 80;
 const MAX_TAG_LENGTH = 50;
 const MAX_TAG_COUNT = 20;
@@ -244,6 +247,56 @@ export function collectFolders(notes: readonly Note[]): string[] {
   return [...folders].sort((left, right) => left.localeCompare(right));
 }
 
+/**
+ * Folder/group match with sub-group support: selecting "Kerja" also matches
+ * "Kerja/Q4". Separator is "/".
+ */
+export function folderMatches(noteFolder: string | undefined, selected: string): boolean {
+  const folder = (noteFolder ?? "").trim();
+  const want = selected.trim();
+  if (!want) return true;
+  return folder === want || folder.startsWith(`${want}/`);
+}
+
+/** Deduped, sorted union of folder lists. */
+export function mergeFolders(...lists: readonly (readonly string[])[]): string[] {
+  const merged = new Set<string>();
+  lists.forEach((list) =>
+    list.forEach((folder) => {
+      const trimmed = folder.trim();
+      if (trimmed) merged.add(trimmed);
+    }),
+  );
+  return [...merged].sort((left, right) => left.localeCompare(right));
+}
+
+/** Depth (0-based) of a hierarchical folder path: "A/B/C" → 2. */
+export function folderDepth(path: string): number {
+  return path.split("/").length - 1;
+}
+
+/** Last segment of a hierarchical folder path: "A/B/C" → "C". */
+export function folderLabel(path: string): string {
+  const segments = path.split("/");
+  return segments[segments.length - 1] ?? path;
+}
+
+/** Subtree-inclusive counts: every ancestor of a note's folder is counted too. */
+export function folderTreeCounts(notes: readonly Note[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  notes.forEach((note) => {
+    if (note.deletedAt !== null) return;
+    const folder = (note.folder ?? "").trim();
+    if (!folder) return;
+    const segments = folder.split("/");
+    for (let i = 1; i <= segments.length; i += 1) {
+      const path = segments.slice(0, i).join("/");
+      totals.set(path, (totals.get(path) ?? 0) + 1);
+    }
+  });
+  return totals;
+}
+
 /** Distinct, sorted share-group names across shared notes. */
 export function collectShareGroups(notes: readonly Note[]): string[] {
   const groups = new Set<string>();
@@ -277,7 +330,7 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
     if (filter.scope === "shared") {
       if (!note.shared) return false;
       if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) return false;
-      if (selectedFolder && (note.folder ?? "").trim() !== selectedFolder) return false;
+      if (selectedFolder && !folderMatches(note.folder, selectedFolder)) return false;
       if (selectedDay && !noteDays(note).includes(selectedDay)) return false;
       if (selectedShareGroup && (note.shareGroup ?? "").trim() !== selectedShareGroup) return false;
       if (query.length === 0) return true;
@@ -304,7 +357,7 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
       return false;
     }
 
-    if (selectedFolder && (note.folder ?? "").trim() !== selectedFolder) {
+    if (selectedFolder && !folderMatches(note.folder, selectedFolder)) {
       return false;
     }
 

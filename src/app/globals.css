@@ -2253,6 +2253,27 @@ button:disabled {
   color: inherit;
 }
 
+.new-group-button {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--control);
+  border-radius: 7px;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.new-group-form {
+  padding: 2px 0 6px;
+}
+
+.new-group-form input {
+  width: 100%;
+}
+
 .share-group-picker {
   display: flex;
   flex-direction: column;

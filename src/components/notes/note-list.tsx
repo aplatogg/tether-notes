@@ -144,7 +144,7 @@ export function NoteList({
       ) : null}
       {selectedFolder ? (
         <div className="active-filter">
-          <span>Folder: {selectedFolder}</span>
+          <span>Group: {selectedFolder}</span>
           <button type="button" onClick={() => onFolderSelect("")}>Clear</button>
         </div>
       ) : null}

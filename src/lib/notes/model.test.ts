@@ -4,7 +4,12 @@ import {
   createDraftNote,
   displayTitle,
   filterNotes,
+  folderDepth,
+  folderLabel,
+  folderMatches,
+  folderTreeCounts,
   matchesSearch,
+  mergeFolders,
   normalizeTags,
   sortNotes,
 } from "./model";
@@ -391,6 +396,51 @@ describe("filterNotes", () => {
     expect(
       filterNotes(sharedNotes, { scope: "all", shareGroup: "Kerja" }).map((note) => note.id),
     ).toContain("own");
+  });
+
+  test("folderMatches supports sub-groups with / separator", () => {
+    expect(folderMatches("Kerja", "Kerja")).toBe(true);
+    expect(folderMatches("Kerja/Q4", "Kerja")).toBe(true);
+    expect(folderMatches("Kerja/Q4/Rinci", "Kerja")).toBe(true);
+    expect(folderMatches("Kerja/Q4", "Kerja/Q4")).toBe(true);
+    expect(folderMatches("Kerja", "Kerja/Q4")).toBe(false);
+    expect(folderMatches("Kerjakan", "Kerja")).toBe(false);
+    expect(folderMatches(undefined, "Kerja")).toBe(false);
+    expect(folderMatches("", "")).toBe(true);
+  });
+
+  test("filterNotes selects a group including its sub-groups", () => {
+    const notes = [
+      makeNote({ id: "root", folder: "Kerja" }),
+      makeNote({ id: "sub", folder: "Kerja/Q4" }),
+      makeNote({ id: "deep", folder: "Kerja/Q4/Rinci" }),
+      makeNote({ id: "other", folder: "Pribadi" }),
+      makeNote({ id: "none" }),
+    ];
+
+    expect(
+      filterNotes(notes, { scope: "all", folder: "Kerja" }).map((note) => note.id).sort(),
+    ).toEqual(["deep", "root", "sub"]);
+    expect(
+      filterNotes(notes, { scope: "all", folder: "Kerja/Q4" }).map((note) => note.id).sort(),
+    ).toEqual(["deep", "sub"]);
+  });
+
+  test("mergeFolders dedupes and sorts; folderTreeCounts counts subtrees", () => {
+    expect(mergeFolders(["B", "A"], ["A", " C "])).toEqual(["A", "B", "C"]);
+
+    const counts = folderTreeCounts([
+      makeNote({ folder: "Kerja" }),
+      makeNote({ folder: "Kerja/Q4" }),
+      makeNote({ folder: "Kerja/Q4/Rinci" }),
+      makeNote({ folder: "" }),
+      makeNote({ folder: "Kerja", deletedAt: NOW }),
+    ]);
+    expect(counts.get("Kerja")).toBe(3);
+    expect(counts.get("Kerja/Q4")).toBe(2);
+    expect(counts.get("Kerja/Q4/Rinci")).toBe(1);
+    expect(folderDepth("A/B/C")).toBe(2);
+    expect(folderLabel("A/B/C")).toBe("C");
   });
 
   test("collectShareGroups returns sorted distinct groups of shared notes only", () => {
