@@ -330,6 +330,11 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
       return false;
     }
 
+    // Grant-shared notes live only in the "shared" scope; own views stay clean.
+    if (note.shared && filter.scope !== "shared") {
+      return false;
+    }
+
     if (filter.scope === "shared") {
       if (!note.shared) return false;
       if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) return false;

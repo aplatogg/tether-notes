@@ -365,6 +365,21 @@ describe("filterNotes", () => {
     ).toEqual(["match"]);
   });
 
+  test("shared notes never leak into own scopes (all/pinned/archived)", () => {
+    const notes = [
+      makeNote({ id: "own" }),
+      makeNote({ id: "shared", shared: true, sharedFor: "me", ownerEmail: "a@x.io" }),
+      makeNote({ id: "ws", workspaceId: "11111111-1111-4111-8111-111111111111" }),
+    ];
+
+    expect(filterNotes(notes, { scope: "all" }).map((note) => note.id).sort()).toEqual([
+      "own",
+      "ws",
+    ]);
+    expect(filterNotes(notes, { scope: "pinned" })).toEqual([]);
+    expect(filterNotes(notes, { scope: "shared" }).map((note) => note.id)).toEqual(["shared"]);
+  });
+
   test("shared scope returns only non-deleted notes shared with us", () => {
     const sharedNotes = [
       makeNote({ id: "own" }),
@@ -456,9 +471,9 @@ describe("filterNotes", () => {
     ).toEqual(["ws-note"]);
     expect(
       filterNotes(notes, { scope: "all", workspace: null }).map((note) => note.id),
-    ).toEqual(["personal", "shared-ws"]);
-    // No workspace filter → everything in scope.
-    expect(filterNotes(notes, { scope: "all" })).toHaveLength(3);
+    ).toEqual(["personal"]);
+    // No workspace filter → everything in scope, except shared notes (shared scope only).
+    expect(filterNotes(notes, { scope: "all" })).toHaveLength(2);
     // Shared scope ignores the workspace filter.
     expect(
       filterNotes(notes, { scope: "shared", workspace: wsId }).map((note) => note.id),

@@ -489,6 +489,11 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setDraft(null);
     setMobilePane("list");
     setNavOpen(false);
+    // "All notes" means every own note: drop the default General group filter.
+    if (nextScope === "all") {
+      setSelectedFolder(null);
+      setFolderCleared(true);
+    }
   }
 
   function handleTagSelect(tag: string) {
