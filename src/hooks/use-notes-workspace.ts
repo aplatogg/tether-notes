@@ -31,6 +31,10 @@ export function useNotesWorkspace(
   const [storageError, setStorageError] = useState<string | null>(null);
   const [syncState, setSyncState] =
     useState<SyncEngineState>(INITIAL_SYNC_STATE);
+  // Bumped after every completed sync so the notes liveQuery re-reads the
+  // table even when rows were last written by another tab (cross-tab writes
+  // don't always re-trigger liveQuery).
+  const [syncTick, setSyncTick] = useState(0);
   const engineRef = useRef<SyncEngine | null>(null);
 
   useEffect(() => {
@@ -71,7 +75,7 @@ export function useNotesWorkspace(
       setStorageError(messageFrom(error));
       return [];
     }
-  }, [repository, userId]);
+  }, [repository, userId, syncTick]);
 
   const pending = useLiveQuery(async () => {
     if (!repository) {
@@ -102,17 +106,25 @@ export function useNotesWorkspace(
 
     const engine = new SyncEngine(repository, adapter, userId);
     engineRef.current = engine;
-    const unsubscribe = engine.subscribe(setSyncState);
+    const unsubscribe = engine.subscribe((next) => {
+      setSyncState(next);
+      if (next.phase === "synced" || next.phase === "error" || next.phase === "local-only") {
+        setSyncTick((tick) => tick + 1);
+      }
+    });
     const handleConnectionChange = () => void engine.sync();
+    const handleFocus = () => void engine.sync();
 
     window.addEventListener("online", handleConnectionChange);
     window.addEventListener("offline", handleConnectionChange);
+    window.addEventListener("focus", handleFocus);
     void engine.start();
 
     return () => {
       unsubscribe();
       window.removeEventListener("online", handleConnectionChange);
       window.removeEventListener("offline", handleConnectionChange);
+      window.removeEventListener("focus", handleFocus);
       engineRef.current = null;
       void engine.stop();
     };
