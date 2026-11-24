@@ -443,6 +443,28 @@ describe("filterNotes", () => {
     expect(folderLabel("A/B/C")).toBe("C");
   });
 
+  test("filterNotes applies the workspace filter only in own scopes", () => {
+    const notes = [
+      makeNote({ id: "personal", workspaceId: null }),
+      makeNote({ id: "ws-note", workspaceId: "11111111-1111-4111-8111-111111111111" }),
+      makeNote({ id: "shared-ws", shared: true, sharedFor: "me" }),
+    ];
+    const wsId = "11111111-1111-4111-8111-111111111111";
+
+    expect(
+      filterNotes(notes, { scope: "all", workspace: wsId }).map((note) => note.id),
+    ).toEqual(["ws-note"]);
+    expect(
+      filterNotes(notes, { scope: "all", workspace: null }).map((note) => note.id),
+    ).toEqual(["personal", "shared-ws"]);
+    // No workspace filter → everything in scope.
+    expect(filterNotes(notes, { scope: "all" })).toHaveLength(3);
+    // Shared scope ignores the workspace filter.
+    expect(
+      filterNotes(notes, { scope: "shared", workspace: wsId }).map((note) => note.id),
+    ).toEqual(["shared-ws"]);
+  });
+
   test("collectShareGroups returns sorted distinct groups of shared notes only", () => {
     const notes = [
       makeNote({ id: "a", shared: true, shareGroup: "Kerja" }),

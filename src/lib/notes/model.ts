@@ -314,6 +314,9 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
   const selectedFolder = (filter.folder ?? "").trim();
   const selectedDay = filter.day !== undefined && DAY_PATTERN.test(filter.day) ? filter.day : "";
   const selectedShareGroup = (filter.shareGroup ?? "").trim();
+  const workspaceFilterApplies =
+    filter.workspace !== undefined &&
+    (filter.scope === "all" || filter.scope === "pinned" || filter.scope === "archived");
 
   return notes.filter((note) => {
     if (filter.scope === "trash") {
@@ -346,6 +349,10 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
     }
 
     if (filter.scope === "archived" && !note.isArchived) {
+      return false;
+    }
+
+    if (workspaceFilterApplies && (note.workspaceId ?? null) !== filter.workspace!) {
       return false;
     }
 

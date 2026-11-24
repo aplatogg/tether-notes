@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, CalendarDays, FileText, Folder, Lock, Pin, UsersRound } from "lucide-react";
+import { Bell, Briefcase, CalendarDays, FileText, Folder, Lock, Pin, UsersRound } from "lucide-react";
 import { CalendarView } from "@/components/notes/calendar-view";
 import { bodyToPlainText } from "@/lib/notes/rich";
 import { displayTitle } from "@/lib/notes/model";
 import { tagColor } from "@/lib/notes/tags";
+import type { Workspace } from "@/lib/supabase/workspaces";
 import type { Note, NoteScope } from "@/lib/notes/types";
 
 interface NoteListProps {
@@ -20,6 +21,7 @@ interface NoteListProps {
   selectedShareGroup: string | null;
   onShareGroupSelect: (group: string) => void;
   onAssignShareGroup: (note: Note, group: string, autogroup: boolean) => void;
+  workspaces: Workspace[];
   showCalendar: boolean;
   calendarDay: string | null;
   calendarNotes: Note[];
@@ -83,6 +85,7 @@ export function NoteList({
   selectedShareGroup,
   onShareGroupSelect,
   onAssignShareGroup,
+  workspaces,
   showCalendar,
   calendarDay,
   calendarNotes,
@@ -212,6 +215,12 @@ export function NoteList({
                     >
                       <UsersRound aria-hidden="true" /> {note.shareGroup?.trim() || "Group"}
                     </button>
+                  ) : null}
+                  {note.workspaceId ? (
+                    <span className="folder-chip" title="Workspace">
+                      <Briefcase aria-hidden="true" />
+                      {workspaces.find((w) => w.id === note.workspaceId)?.name ?? "Workspace"}
+                    </span>
                   ) : null}
                   <span>{formatUpdatedAt(note.updatedAt)}</span>
                 </span>

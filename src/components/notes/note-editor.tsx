@@ -19,11 +19,12 @@ import {
   X,
 } from "lucide-react";
 import { RichEditor } from "@/components/notes/rich-editor";
-import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl } from "@/components/notes/note-extras";
+import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl, WorkspaceSelect } from "@/components/notes/note-extras";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
 import { normalizeTags } from "@/lib/notes/model";
 import { trashDaysLeft } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
+import type { Workspace } from "@/lib/supabase/workspaces";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   createShareLink,
@@ -39,6 +40,7 @@ interface NoteEditorProps {
   isDirty: boolean;
   isLocalOnly: boolean;
   folders: string[];
+  workspaces: Workspace[];
   onChange: (changes: Partial<Note>) => void;
   onSave: () => void;
   onTogglePin: () => void;
@@ -65,6 +67,7 @@ export function NoteEditor({
   isDirty,
   isLocalOnly,
   folders,
+  workspaces,
   onChange,
   onSave,
   onTogglePin,
@@ -401,6 +404,9 @@ export function NoteEditor({
                   maxLength={500}
                 />
                 <FolderInput note={note} folders={folders} readOnly={readOnly || note.deletedAt !== null} onChange={onChange} />
+                {workspaces.length > 0 ? (
+                  <WorkspaceSelect note={note} workspaces={workspaces} readOnly={readOnly || note.deletedAt !== null} onChange={onChange} />
+                ) : null}
                 <RichEditor
                   key={note.id}
                   readOnly={note.deletedAt !== null || readOnly}

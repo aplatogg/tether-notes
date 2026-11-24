@@ -27,6 +27,8 @@ export interface Note {
   reminderAt?: string | null;
   /** Optional folder name for grouping beyond tags. */
   folder?: string;
+  /** Team workspace this note belongs to; null = personal note. */
+  workspaceId?: string | null;
 }
 
 export interface CreateDraftNoteInput {
@@ -50,6 +52,11 @@ export interface NoteFilter {
   day?: string;
   /** Group filter for the "shared" scope (matches the note's shareGroup). */
   shareGroup?: string;
+  /**
+   * Workspace filter for own scopes: undefined = no filter, null = personal
+   * notes only, string = that workspace's notes.
+   */
+  workspace?: string | null;
 }
 
 

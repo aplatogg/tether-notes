@@ -123,6 +123,38 @@ export function FolderInput({
   );
 }
 
+export function WorkspaceSelect({
+  note,
+  workspaces,
+  readOnly,
+  onChange,
+}: {
+  note: Note;
+  workspaces: { id: string; name: string }[];
+  readOnly: boolean;
+  onChange: (changes: Partial<Note>) => void;
+}) {
+  return (
+    <label className="folder-input">
+      <span className="sr-only">Workspace</span>
+      <select
+        aria-label="Workspace"
+        defaultValue={note.workspaceId ?? ""}
+        key={`workspace-${note.id}`}
+        disabled={readOnly}
+        onChange={(event) => onChange({ workspaceId: event.target.value || null })}
+      >
+        <option value="">Personal</option>
+        {workspaces.map((workspace) => (
+          <option key={workspace.id} value={workspace.id}>
+            {workspace.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /* ---------- attachments + voice ---------- */
 
 export function AttachmentsPanel({

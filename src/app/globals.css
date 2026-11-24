@@ -2253,6 +2253,40 @@ button:disabled {
   color: inherit;
 }
 
+.folder-input select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: inherit;
+  padding: 0 8px;
+}
+
+.workspace-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.workspace-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.workspace-manage {
+  width: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.workspace-manage:hover {
+  color: inherit;
+}
+
 .new-group-button {
   margin-left: auto;
   width: 22px;

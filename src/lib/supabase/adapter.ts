@@ -17,6 +17,7 @@ const remoteNoteSchema = z
     lock_hash: z.string().nullable().optional(),
     reminder_at: timestampSchema.nullable().optional(),
     folder: z.string().optional(),
+    workspace_id: z.uuid().nullable().optional(),
     deleted_at: timestampSchema.nullable(),
     created_at: timestampSchema,
     updated_at: timestampSchema,
@@ -47,6 +48,7 @@ export function noteToRemoteRow(note: Note): RemoteNoteRow {
     lock_hash: note.lockHash ?? null,
     reminder_at: note.reminderAt ?? null,
     folder: note.folder ?? "",
+    workspace_id: note.workspaceId ?? null,
     deleted_at: note.deletedAt,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
@@ -55,7 +57,9 @@ export function noteToRemoteRow(note: Note): RemoteNoteRow {
 
 export function remoteRowToNote(value: unknown, currentUserId?: string): Note {
   const row = remoteNoteSchema.parse(value);
-  const shared = currentUserId !== undefined && row.user_id !== currentUserId;
+  // Workspace notes owned by others are collaborative (read-write), not read-only shares.
+  const shared =
+    currentUserId !== undefined && row.user_id !== currentUserId && !row.workspace_id;
 
   return {
     id: row.id,
@@ -68,6 +72,7 @@ export function remoteRowToNote(value: unknown, currentUserId?: string): Note {
     lockHash: row.lock_hash ?? null,
     reminderAt: row.reminder_at ?? null,
     folder: row.folder ?? "",
+    workspaceId: row.workspace_id ?? null,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -116,6 +121,22 @@ function applyShareMeta(note: Note, meta: ShareMeta): Note {
   return note;
 }
 
+async function pullNotes(client: SupabaseClient, userId: string): Promise<Note[]> {
+  // RLS returns our own notes plus notes shared with us and workspace notes; no user_id filter.
+  const { data, error } = await client
+    .from("notes")
+    .select(
+      "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,reminder_at,folder,workspace_id,deleted_at,created_at,updated_at",
+    )
+    .order("updated_at", { ascending: true });
+
+  throwIfError(error);
+
+  const meta = await fetchShareMeta(client);
+
+  return (data ?? []).map((row) => applyShareMeta(remoteRowToNote(row, userId), meta));
+}
+
 export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
   const write = async (note: Note): Promise<void> => {
     const { error } = await client
@@ -126,19 +147,7 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
 
   return {
     async pull(userId) {
-      // RLS returns our own notes plus notes shared with us; no user_id filter.
-      const { data, error } = await client
-        .from("notes")
-        .select(
-          "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,reminder_at,folder,deleted_at,created_at,updated_at",
-        )
-        .order("updated_at", { ascending: true });
-
-      throwIfError(error);
-
-      const meta = await fetchShareMeta(client);
-
-      return (data ?? []).map((row) => applyShareMeta(remoteRowToNote(row, userId), meta));
+      return pullNotes(client, userId);
     },
 
     upsert: write,
@@ -182,8 +191,23 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
           }
         });
 
+      // Membership/workspace changes can add or remove visible notes: re-pull and re-emit.
+      const metaChannel = client
+        .channel(`workspace-meta:${userId}:${globalThis.crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "workspace_members" },
+          () => {
+            void pullNotes(client, userId)
+              .then((notes) => notes.forEach((note) => void onRemoteNote(note)))
+              .catch(onError);
+          },
+        )
+        .subscribe();
+
       return async () => {
         await client.removeChannel(channel);
+        await client.removeChannel(metaChannel);
       };
     },
   };

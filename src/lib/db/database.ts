@@ -26,6 +26,7 @@ export interface StoredNote extends Note {
   archivedIndex?: 0 | 1;
   deletedIndex?: 0 | 1;
   sharedIndex?: 0 | 1;
+  workspaceIndex?: 0 | 1;
 }
 
 export interface NotesDatabaseOptions {
@@ -81,6 +82,22 @@ export class NotesDatabase extends Dexie {
           });
       });
 
+    this.version(4)
+      .stores({
+        notes:
+          "id, userId, ownerKey, sharedIndex, workspaceIndex, updatedAt, isArchived, isPinned, deletedAt, [userId+updatedAt], [userId+isArchived], [userId+isPinned], [userId+deletedAt], [ownerKey+updatedAt], [ownerKey+archivedIndex], [ownerKey+pinnedIndex], [ownerKey+deletedIndex]",
+        outbox: "noteId, userId, kind, operationId, createdAt, updatedAt",
+        metadata: "key",
+      })
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<StoredNote, string>("notes")
+          .toCollection()
+          .modify((note) => {
+            note.workspaceIndex = note.workspaceId ? 1 : 0;
+          });
+      });
+
     this.meta = this.table("metadata");
   }
 }
@@ -90,9 +107,12 @@ export function ownerKeyFor(userId: string | null): string {
 }
 
 export function noteIndexFields(
-  note: Pick<Note, "userId" | "isPinned" | "isArchived" | "deletedAt" | "shared">,
+  note: Pick<Note, "userId" | "isPinned" | "isArchived" | "deletedAt" | "shared" | "workspaceId">,
 ): Required<
-  Pick<StoredNote, "ownerKey" | "pinnedIndex" | "archivedIndex" | "deletedIndex" | "sharedIndex">
+  Pick<
+    StoredNote,
+    "ownerKey" | "pinnedIndex" | "archivedIndex" | "deletedIndex" | "sharedIndex" | "workspaceIndex"
+  >
 > {
   return {
     ownerKey: ownerKeyFor(note.userId),
@@ -100,6 +120,7 @@ export function noteIndexFields(
     archivedIndex: note.isArchived ? 1 : 0,
     deletedIndex: note.deletedAt === null ? 0 : 1,
     sharedIndex: note.shared ? 1 : 0,
+    workspaceIndex: note.workspaceId ? 1 : 0,
   };
 }
 
@@ -114,6 +135,7 @@ export function fromStoredNote(note: StoredNote): Note {
   delete value.archivedIndex;
   delete value.deletedIndex;
   delete value.sharedIndex;
+  delete value.workspaceIndex;
 
   return value;
 }

@@ -12,6 +12,7 @@ import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   Archive,
   Bell,
+  Briefcase,
   Check,
   CircleAlert,
   Database,
@@ -30,6 +31,7 @@ import {
   UserRound,
   UsersRound,
   WifiOff,
+  X,
 } from "lucide-react";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { NoteEditor } from "@/components/notes/note-editor";
@@ -64,6 +66,16 @@ import type { Note, NoteScope } from "@/lib/notes/types";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { setSharedNoteGroup, setShareAutogroup } from "@/lib/supabase/sharing";
+import {
+  createWorkspace,
+  inviteWorkspaceMember,
+  leaveWorkspace,
+  listMyWorkspaces,
+  listWorkspaceMembers,
+  removeWorkspaceMember,
+  type Workspace,
+  type WorkspaceMember,
+} from "@/lib/supabase/workspaces";
 import type { SyncAdapter, SyncEngineState } from "@/lib/sync/engine";
 
 function Brand() {
@@ -146,6 +158,15 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupError, setNewGroupError] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [membersDialog, setMembersDialog] = useState<Workspace | null>(null);
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [membersBusy, setMembersBusy] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -191,10 +212,49 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           folder: effectiveFolder ?? undefined,
           day: calendarDay ?? undefined,
           shareGroup: scope === "shared" ? (selectedShareGroup ?? undefined) : undefined,
+          workspace: selectedWorkspace,
         }),
       ),
-    [notesWithDraft, query, scope, selectedTag, effectiveFolder, calendarDay, selectedShareGroup],
+    [
+      notesWithDraft,
+      query,
+      scope,
+      selectedTag,
+      effectiveFolder,
+      calendarDay,
+      selectedShareGroup,
+      selectedWorkspace,
+    ],
   );
+
+  const workspaceCounts = useMemo(() => {
+    const totals = new Map<string, number>();
+    workspaces.forEach((ws) => {
+      totals.set(
+        ws.id,
+        filterNotes(notesWithDraft, { scope: "all", workspace: ws.id }).length,
+      );
+    });
+    return totals;
+  }, [notesWithDraft, workspaces]);
+
+  const personalCount = useMemo(
+    () => filterNotes(notesWithDraft, { scope: "all", workspace: null }).length,
+    [notesWithDraft],
+  );
+
+  useEffect(() => {
+    if (!client || !userId) return;
+    let active = true;
+    void listMyWorkspaces(client)
+      .then((list) => {
+        if (active) setWorkspaces(list);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [client, userId]);
 
   const shareGroups = useMemo(() => collectShareGroups(notesWithDraft), [notesWithDraft]);
 
@@ -273,9 +333,12 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
 
     try {
       let note = await workspace.createNote();
-      // New notes land in the user's default "General" group.
-      if (!note.folder?.trim()) {
-        note = await workspace.saveNote({ ...note, folder: DEFAULT_GROUP });
+      // New notes land in the default "General" group and the selected workspace (if any).
+      const changes: Partial<Note> = {};
+      if (!note.folder?.trim()) changes.folder = DEFAULT_GROUP;
+      if (selectedWorkspace) changes.workspaceId = selectedWorkspace;
+      if (Object.keys(changes).length > 0) {
+        note = await workspace.saveNote({ ...note, ...changes });
       }
       draftRevision.current += 1;
       setSelectedId(note.id);
@@ -403,6 +466,81 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setFolderCleared(!folder);
     setMobilePane("list");
     setNavOpen(false);
+  }
+
+  async function handleCreateWorkspace() {
+    if (!client || !newWorkspaceName.trim()) return;
+    setWorkspaceError(null);
+    try {
+      const id = await createWorkspace(client, newWorkspaceName.trim());
+      const list = await listMyWorkspaces(client);
+      setWorkspaces(list);
+      setCreatingWorkspace(false);
+      setNewWorkspaceName("");
+      setSelectedWorkspace(id);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function openMembersDialog(ws: Workspace) {
+    if (!client) return;
+    setMembersDialog(ws);
+    setInviteEmail("");
+    setWorkspaceError(null);
+    setMembersBusy(true);
+    try {
+      setMembers(await listWorkspaceMembers(client, ws.id));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMembersBusy(false);
+    }
+  }
+
+  async function handleInviteMember() {
+    if (!client || !membersDialog || !inviteEmail.trim()) return;
+    setMembersBusy(true);
+    setWorkspaceError(null);
+    try {
+      await inviteWorkspaceMember(client, membersDialog.id, inviteEmail.trim());
+      setMembers(await listWorkspaceMembers(client, membersDialog.id));
+      setInviteEmail("");
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMembersBusy(false);
+    }
+  }
+
+  async function handleRemoveMember(member: WorkspaceMember) {
+    if (!client || !membersDialog) return;
+    setMembersBusy(true);
+    setWorkspaceError(null);
+    try {
+      await removeWorkspaceMember(client, membersDialog.id, member.userId);
+      setMembers(await listWorkspaceMembers(client, membersDialog.id));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMembersBusy(false);
+    }
+  }
+
+  async function handleLeaveWorkspace() {
+    if (!client || !membersDialog) return;
+    setMembersBusy(true);
+    setWorkspaceError(null);
+    try {
+      await leaveWorkspace(client, membersDialog.id);
+      setWorkspaces(await listMyWorkspaces(client));
+      setMembersDialog(null);
+      setSelectedWorkspace(null);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMembersBusy(false);
+    }
   }
 
   async function handleCreateGroup() {
@@ -548,6 +686,83 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           <kbd>⌘ N</kbd>
         </button>
 
+        {client && userId ? (
+          <div className="sidebar-tags">
+            <p>
+              <Briefcase aria-hidden="true" /> Workspaces
+              <button
+                type="button"
+                className="new-group-button"
+                aria-label="New workspace"
+                title="New workspace"
+                onClick={() => {
+                  setCreatingWorkspace((value) => !value);
+                  setNewWorkspaceName("");
+                  setWorkspaceError(null);
+                }}
+              >
+                +
+              </button>
+            </p>
+            {creatingWorkspace ? (
+              <form
+                className="new-group-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleCreateWorkspace();
+                }}
+              >
+                <input
+                  type="text"
+                  aria-label="New workspace name"
+                  placeholder="Tim Kerja"
+                  maxLength={60}
+                  autoFocus
+                  value={newWorkspaceName}
+                  onChange={(event) => setNewWorkspaceName(event.target.value)}
+                />
+              </form>
+            ) : null}
+            <button
+              className={selectedWorkspace === null ? "is-active" : undefined}
+              type="button"
+              onClick={() => {
+                setSelectedWorkspace(null);
+                setMobilePane("list");
+                setNavOpen(false);
+              }}
+            >
+              <span>Personal</span>
+              <span className="num">{personalCount}</span>
+            </button>
+            {workspaces.map((ws) => (
+              <div className="workspace-row" key={ws.id}>
+                <button
+                  className={selectedWorkspace === ws.id ? "is-active" : undefined}
+                  type="button"
+                  onClick={() => {
+                    setSelectedWorkspace(ws.id);
+                    setMobilePane("list");
+                    setNavOpen(false);
+                  }}
+                >
+                  <span>{ws.name}</span>
+                  <span className="num">{workspaceCounts.get(ws.id) ?? 0}</span>
+                </button>
+                <button
+                  type="button"
+                  className="workspace-manage"
+                  aria-label={`Members of ${ws.name}`}
+                  title="Members"
+                  onClick={() => void openMembersDialog(ws)}
+                >
+                  <UsersRound aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <nav className="sidebar-nav" aria-label="Note filters">
           <p>Notes</p>
           {([
@@ -669,6 +884,68 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
         </div>
       </aside>
 
+      {membersDialog ? (
+        <div className="pin-backdrop" role="dialog" aria-modal="true" aria-label={`Members of ${membersDialog.name}`}>
+          <div className="pin-dialog">
+            <h2>{membersDialog.name}</h2>
+            <p>Members can read and edit every note in this workspace. Invite by account email.</p>
+            {membersDialog.role === "owner" ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleInviteMember();
+                }}
+              >
+                <label className="sr-only" htmlFor="invite-email">Email</label>
+                <input
+                  id="invite-email"
+                  type="email"
+                  autoComplete="off"
+                  placeholder="name@example.com"
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                />
+                <div className="pin-actions">
+                  <button className="primary-button" type="submit" disabled={membersBusy || !inviteEmail.trim()}>
+                    {membersBusy ? "Working…" : "Invite"}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+            {members.length > 0 ? (
+              <ul className="grant-list">
+                {members.map((member) => (
+                  <li key={member.userId}>
+                    <span>{member.email} · {member.role}</span>
+                    {membersDialog.role === "owner" && member.role !== "owner" ? (
+                      <button
+                        type="button"
+                        className="danger-link"
+                        disabled={membersBusy}
+                        onClick={() => void handleRemoveMember(member)}
+                      >
+                        <X aria-hidden="true" /> Remove
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="grant-empty">No members yet.</p>
+            )}
+            {workspaceError ? <p className="form-error" role="alert">{workspaceError}</p> : null}
+            <div className="pin-actions">
+              {membersDialog.role !== "owner" ? (
+                <button type="button" className="danger-link" disabled={membersBusy} onClick={() => void handleLeaveWorkspace()}>
+                  Leave workspace
+                </button>
+              ) : null}
+              <button type="button" className="secondary-button" onClick={() => setMembersDialog(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <header className="topbar">
         <button
           className="icon-button nav-toggle"
@@ -779,6 +1056,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
               onFolderSelect={handleFolderSelect}
               shareGroups={shareGroups}
               selectedShareGroup={selectedShareGroup}
+              workspaces={workspaces}
               onShareGroupSelect={handleShareGroupSelect}
               onAssignShareGroup={(note, group, autogroup) =>
                 void handleAssignShareGroup(note, group, autogroup)
@@ -793,6 +1071,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
               isDirty={isDirty}
               isLocalOnly={workspace.syncState.phase === "local-only"}
               folders={folders}
+              workspaces={workspaces}
               onChange={handleDraftChange}
             onSave={flushCurrentDraft}
             onTogglePin={handleTogglePin}

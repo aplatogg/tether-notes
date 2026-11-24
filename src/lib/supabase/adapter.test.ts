@@ -30,6 +30,7 @@ describe("Supabase note mapping", () => {
       lock_hash: null,
       reminder_at: null,
       folder: "",
+      workspace_id: null,
       deleted_at: null,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
@@ -48,7 +49,16 @@ describe("Supabase note mapping", () => {
       sharedFor: null,
       ownerEmail: null,
       shareGroup: null,
+      workspaceId: null,
     });
+  });
+
+  test("workspace notes owned by others are collaborative, not read-only shares", () => {
+    const row = { ...noteToRemoteRow(note), workspace_id: "11111111-1111-4111-8111-111111111111" };
+    const mapped = remoteRowToNote(row, "current-user");
+    expect(mapped.shared).toBe(false);
+    expect(mapped.sharedFor).toBeNull();
+    expect(mapped.workspaceId).toBe("11111111-1111-4111-8111-111111111111");
   });
 
   test("marks rows owned by someone else as shared with the current user", () => {

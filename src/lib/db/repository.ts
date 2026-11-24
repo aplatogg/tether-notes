@@ -33,8 +33,12 @@ export const noteSchema = z
     shareGroup: z.string().nullable().optional(),
     reminderAt: timestampSchema.nullable().optional(),
     folder: z.string().optional(),
+    workspaceId: z.uuid().nullable().optional(),
   })
   .strict();
+
+/** Outbox mutations for workspace notes use this owner so they sync under any signed-in user. */
+export const WORKSPACE_MUTATION_OWNER = "workspace";
 
 const remoteDeleteSchema = z
   .object({
@@ -108,13 +112,23 @@ export class NotesRepository {
             .equals(1)
             .filter((note) => note.sharedFor === ownerId)
             .toArray();
+    // Workspace notes are stored under the owner's key but flagged; RLS only
+    // ever delivers workspaces this account belongs to.
+    const workspaceNotes =
+      ownerId === null
+        ? []
+        : await this.database.notes.where("workspaceIndex").equals(1).toArray();
 
-    return sortNotes([...own, ...shared].map((note) => parseNote(fromStoredNote(note))));
+    return sortNotes(
+      [...own, ...shared, ...workspaceNotes].map((note) => parseNote(fromStoredNote(note))),
+    );
   }
 
   private async assertNotShared(noteId: string): Promise<void> {
     const existing = await this.database.notes.get(noteId);
-    if (existing?.shared) {
+    // Workspace notes are collaborative (read-write for members); only
+    // grant-shared notes are read-only.
+    if (existing?.shared && !existing.workspaceId) {
       throw new Error("Notes shared with you are read-only");
     }
   }
@@ -141,7 +155,7 @@ export class NotesRepository {
         });
         const mutation: OutboxMutation = {
           noteId: saved.id,
-          userId: saved.userId,
+          userId: saved.workspaceId ? WORKSPACE_MUTATION_OWNER : saved.userId,
           kind: "upsert",
           payload: saved,
           operationId,
@@ -184,7 +198,7 @@ export class NotesRepository {
         });
         const mutation: OutboxMutation = {
           noteId: saved.id,
-          userId: saved.userId,
+          userId: saved.workspaceId ? WORKSPACE_MUTATION_OWNER : saved.userId,
           kind: "delete",
           payload: saved,
           operationId,
@@ -365,7 +379,7 @@ export class NotesRepository {
         });
         const mutation: OutboxMutation = {
           noteId: restored.id,
-          userId: restored.userId,
+          userId: restored.workspaceId ? WORKSPACE_MUTATION_OWNER : restored.userId,
           kind: "upsert",
           payload: restored,
           operationId,
@@ -468,12 +482,18 @@ export class NotesRepository {
           .equals(1)
           .filter((note) => note.sharedFor === ownerId)
           .delete();
+        const workspaceDeleted = await this.database.notes
+          .where("workspaceIndex")
+          .equals(1)
+          .delete();
         const mutationsDeleted = await this.database.outbox
-          .where("userId")
-          .equals(ownerId)
+          .filter(
+            (mutation) =>
+              mutation.userId === ownerId || mutation.userId === WORKSPACE_MUTATION_OWNER,
+          )
           .delete();
 
-        return { notesDeleted: notesDeleted + sharedDeleted, mutationsDeleted };
+        return { notesDeleted: notesDeleted + sharedDeleted + workspaceDeleted, mutationsDeleted };
       },
     );
   }
@@ -490,7 +510,12 @@ export class NotesRepository {
           ? await this.database.outbox
               .filter((mutation) => mutation.userId === null)
               .toArray()
-          : await this.database.outbox.where("userId").equals(ownerId).toArray();
+          : await this.database.outbox
+              .filter(
+                (mutation) =>
+                  mutation.userId === ownerId || mutation.userId === WORKSPACE_MUTATION_OWNER,
+              )
+              .toArray();
     }
 
     return mutations.sort((left, right) => {
