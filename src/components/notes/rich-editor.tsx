@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import { EditorContent, Extension, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -33,6 +33,28 @@ import {
 } from "lucide-react";
 import { countWords, markdownToHtml } from "@/lib/notes/rich";
 
+/** Tab nests list items, moves through tables, or inserts spaces in prose. */
+const TabKeymap = Extension.create({
+  name: "tabKeymap",
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        const { editor } = this;
+        if (editor.isActive("table")) return editor.commands.goToNextCell();
+        if (editor.can().sinkListItem("taskItem")) return editor.commands.sinkListItem("taskItem");
+        if (editor.can().sinkListItem("listItem")) return editor.commands.sinkListItem("listItem");
+        return editor.commands.insertContent("\u00A0\u00A0\u00A0\u00A0");
+      },
+      "Shift-Tab": () => {
+        const { editor } = this;
+        if (editor.isActive("table")) return editor.commands.goToPreviousCell();
+        if (editor.can().liftListItem("taskItem")) return editor.commands.liftListItem("taskItem");
+        if (editor.can().liftListItem("listItem")) return editor.commands.liftListItem("listItem");
+        return true;
+      },
+    };
+  },
+});
 interface RichEditorProps {
   value: string;
   readOnly?: boolean;
@@ -195,6 +217,7 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
+      TabKeymap,
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),
       TaskList,
@@ -253,6 +276,7 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
     </div>
   );
 }
+
 
 
 
