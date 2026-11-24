@@ -244,11 +244,23 @@ export function collectFolders(notes: readonly Note[]): string[] {
   return [...folders].sort((left, right) => left.localeCompare(right));
 }
 
+/** Distinct, sorted share-group names across shared notes. */
+export function collectShareGroups(notes: readonly Note[]): string[] {
+  const groups = new Set<string>();
+  notes.forEach((note) => {
+    if (!note.shared) return;
+    const group = (note.shareGroup ?? "").trim();
+    if (group) groups.add(group);
+  });
+  return [...groups].sort((left, right) => left.localeCompare(right));
+}
+
 export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] {
   const selectedTag = filter.tag === undefined ? "" : normalizeTag(filter.tag);
   const query = normalizeSearchText(filter.query ?? "").trim();
   const selectedFolder = (filter.folder ?? "").trim();
   const selectedDay = filter.day !== undefined && DAY_PATTERN.test(filter.day) ? filter.day : "";
+  const selectedShareGroup = (filter.shareGroup ?? "").trim();
 
   return notes.filter((note) => {
     if (filter.scope === "trash") {
@@ -267,6 +279,7 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
       if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) return false;
       if (selectedFolder && (note.folder ?? "").trim() !== selectedFolder) return false;
       if (selectedDay && !noteDays(note).includes(selectedDay)) return false;
+      if (selectedShareGroup && (note.shareGroup ?? "").trim() !== selectedShareGroup) return false;
       if (query.length === 0) return true;
       return matchesSearch(note, query);
     }

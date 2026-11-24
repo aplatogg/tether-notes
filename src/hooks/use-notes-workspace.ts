@@ -157,6 +157,13 @@ export function useNotesWorkspace(
     return saved;
   }
 
+  /** Updates the recipient-side group label locally (server side goes through an RPC). */
+  async function setShareGroup(noteId: string, group: string | null): Promise<Note> {
+    return withRepository((activeRepository) =>
+      activeRepository.setLocalShareGroup(noteId, group),
+    );
+  }
+
   async function deleteForever(noteId: string): Promise<void> {
     await withRepository(async (activeRepository) => {
       if (adapter?.purge) {
@@ -197,6 +204,7 @@ export function useNotesWorkspace(
     saveNote,
     deleteNote,
     restoreNote,
+    setShareGroup,
     deleteForever,
     purgeExpiredTrash,
     retrySync: () => engineRef.current?.sync() ?? Promise.resolve(),

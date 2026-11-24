@@ -21,6 +21,8 @@ export interface Note {
   sharedFor?: string | null;
   /** Owner's email, shown on notes shared with us. */
   ownerEmail?: string | null;
+  /** Recipient-side group label for a shared note (grant label or sender auto-group rule). */
+  shareGroup?: string | null;
   /** Optional reminder timestamp (ISO); fires a local notification when due. */
   reminderAt?: string | null;
   /** Optional folder name for grouping beyond tags. */
@@ -46,6 +48,8 @@ export interface NoteFilter {
   folder?: string;
   /** Calendar day filter, YYYY-MM-DD (matches createdAt or reminderAt day). */
   day?: string;
+  /** Group filter for the "shared" scope (matches the note's shareGroup). */
+  shareGroup?: string;
 }
 
 

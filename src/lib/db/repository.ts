@@ -30,6 +30,7 @@ export const noteSchema = z
     shared: z.boolean().optional(),
     sharedFor: z.string().nullable().optional(),
     ownerEmail: z.string().nullable().optional(),
+    shareGroup: z.string().nullable().optional(),
     reminderAt: timestampSchema.nullable().optional(),
     folder: z.string().optional(),
   })
@@ -377,6 +378,30 @@ export class NotesRepository {
       },
     );
   }
+  /**
+   * Sets the recipient-side group label on a shared note locally, without
+   * queueing an outbox mutation (shared notes are read-only remotely; the
+   * label itself lives on the grant row via an RPC).
+   */
+  async setLocalShareGroup(noteId: string, group: string | null): Promise<Note> {
+    const id = z.string().min(1).parse(noteId);
+
+    return this.database.transaction("rw", this.database.notes, async () => {
+      const existing = await this.database.notes.get(id);
+      if (!existing) {
+        throw new Error(`Note not found: ${id}`);
+      }
+
+      const saved = parseNote({
+        ...parseNote(fromStoredNote(existing)),
+        shareGroup: group ? group.trim() : null,
+      });
+
+      await this.database.notes.put(toStoredNote(saved));
+      return saved;
+    });
+  }
+
   async removeMutation(noteId: string, operationId: string): Promise<boolean> {
     const id = z.string().min(1).parse(noteId);
     const expectedOperationId = z.string().min(1).parse(operationId);

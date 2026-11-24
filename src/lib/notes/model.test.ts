@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
+  collectShareGroups,
   createDraftNote,
   displayTitle,
   filterNotes,
@@ -373,6 +374,35 @@ describe("filterNotes", () => {
     expect(
       filterNotes(sharedNotes, { scope: "shared", query: "own" }).map((note) => note.id),
     ).toEqual([]);
+  });
+
+  test("shared scope filters by share group and ignores the group filter in other scopes", () => {
+    const sharedNotes = [
+      makeNote({ id: "g-work", shared: true, sharedFor: "me", shareGroup: "Kerja" }),
+      makeNote({ id: "g-personal", shared: true, sharedFor: "me", shareGroup: "Personal" }),
+      makeNote({ id: "g-none", shared: true, sharedFor: "me" }),
+      makeNote({ id: "own", shareGroup: "Kerja" }),
+    ];
+
+    expect(
+      filterNotes(sharedNotes, { scope: "shared", shareGroup: "Kerja" }).map((note) => note.id),
+    ).toEqual(["g-work"]);
+    // Group filter only applies to the shared scope.
+    expect(
+      filterNotes(sharedNotes, { scope: "all", shareGroup: "Kerja" }).map((note) => note.id),
+    ).toContain("own");
+  });
+
+  test("collectShareGroups returns sorted distinct groups of shared notes only", () => {
+    const notes = [
+      makeNote({ id: "a", shared: true, shareGroup: "Kerja" }),
+      makeNote({ id: "b", shared: true, shareGroup: " personal " }),
+      makeNote({ id: "c", shared: true, shareGroup: "Kerja" }),
+      makeNote({ id: "d", shared: true }),
+      makeNote({ id: "e", shareGroup: "Ignored" }),
+    ];
+
+    expect(collectShareGroups(notes)).toEqual(["Kerja", "personal"]);
   });
 
   test("does not mutate the input collection", () => {

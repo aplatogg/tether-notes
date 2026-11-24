@@ -47,6 +47,7 @@ describe("Supabase note mapping", () => {
       shared: false,
       sharedFor: null,
       ownerEmail: null,
+      shareGroup: null,
     });
   });
 

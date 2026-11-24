@@ -2211,6 +2211,31 @@ button:disabled {
   color: inherit;
 }
 
+.share-group-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--sheet-border);
+}
+
+.share-group-picker input[type="text"] {
+  width: 100%;
+}
+
+.share-group-picker label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.share-group-picker-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .pane-heading-actions {
   display: flex;
   gap: 6px;

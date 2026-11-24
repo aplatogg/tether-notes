@@ -35,6 +35,7 @@ import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
 import {
   collectFolders,
+  collectShareGroups,
   filterNotes,
   normalizeTags,
   sortNotes,
@@ -56,6 +57,7 @@ import { tagColor } from "@/lib/notes/tags";
 import type { Note, NoteScope } from "@/lib/notes/types";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { setSharedNoteGroup, setShareAutogroup } from "@/lib/supabase/sharing";
 import type { SyncAdapter, SyncEngineState } from "@/lib/sync/engine";
 
 function Brand() {
@@ -122,17 +124,19 @@ interface WorkspaceProps {
   userId: string | null;
   email: string | null;
   adapter: SyncAdapter | null;
+  client: SupabaseClient | null;
   onSignOut?: () => Promise<void>;
   bootWarning?: string | null;
 }
 
-function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: WorkspaceProps) {
+function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning }: WorkspaceProps) {
   const workspace = useNotesWorkspace(userId, adapter);
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [scope, setScope] = useState<NoteScope>("all");
   const [query, setQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [selectedShareGroup, setSelectedShareGroup] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -165,12 +169,25 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
           tag: selectedTag ?? undefined,
           folder: selectedFolder ?? undefined,
           day: calendarDay ?? undefined,
+          shareGroup: scope === "shared" ? (selectedShareGroup ?? undefined) : undefined,
         }),
       ),
-    [notesWithDraft, query, scope, selectedTag, selectedFolder, calendarDay],
+    [notesWithDraft, query, scope, selectedTag, selectedFolder, calendarDay, selectedShareGroup],
   );
 
   const folders = useMemo(() => collectFolders(notesWithDraft), [notesWithDraft]);
+
+  const shareGroups = useMemo(() => collectShareGroups(notesWithDraft), [notesWithDraft]);
+
+  const shareGroupCounts = useMemo(() => {
+    const totals = new Map<string, number>();
+    notesWithDraft.forEach((note) => {
+      if (!note.shared || note.deletedAt !== null) return;
+      const group = (note.shareGroup ?? "").trim();
+      if (group) totals.set(group, (totals.get(group) ?? 0) + 1);
+    });
+    return totals;
+  }, [notesWithDraft]);
 
   const folderCounts = useMemo(() => {
     const totals = new Map<string, number>();
@@ -369,6 +386,25 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
     setMobilePane("list");
   }
 
+  function handleShareGroupSelect(group: string) {
+    setSelectedShareGroup(group || null);
+    if (scope !== "shared") setScope("shared");
+    setMobilePane("list");
+  }
+
+  async function handleAssignShareGroup(note: Note, group: string, autogroup: boolean) {
+    if (!client) return;
+    try {
+      await setSharedNoteGroup(client, note.id, group);
+      if (autogroup && note.ownerEmail) {
+        await setShareAutogroup(client, note.ownerEmail, group);
+      }
+      await workspace.setShareGroup(note.id, group || null);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   function handleExport() {
     const own = (notesWithDraft ?? []).filter((note) => !note.shared);
     const stamp = new Date().toISOString().slice(0, 10);
@@ -526,6 +562,23 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
           </div>
         ) : null}
 
+        {shareGroups.length > 0 ? (
+          <div className="sidebar-tags">
+            <p><UsersRound aria-hidden="true" /> Share groups</p>
+            {shareGroups.slice(0, 10).map((group) => (
+              <button
+                className={selectedShareGroup === group && scope === "shared" ? "is-active" : undefined}
+                type="button"
+                key={group}
+                onClick={() => handleShareGroupSelect(group)}
+              >
+                <span>{group}</span>
+                <span className="num">{shareGroupCounts.get(group) ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
 
         <div className="sidebar-foot">
           <span>{userId ? "Synced workspace" : "On this device"}</span>
@@ -632,6 +685,12 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
               onSelect={handleSelect}
               onTagSelect={handleTagSelect}
               onFolderSelect={handleFolderSelect}
+              shareGroups={shareGroups}
+              selectedShareGroup={selectedShareGroup}
+              onShareGroupSelect={handleShareGroupSelect}
+              onAssignShareGroup={(note, group, autogroup) =>
+                void handleAssignShareGroup(note, group, autogroup)
+              }
               onToggleCalendar={() => setShowCalendar((value) => !value)}
               onSelectDay={setCalendarDay}
               onCreate={() => void handleCreate()}
@@ -759,7 +818,7 @@ function CloudWorkspace({
   }, [client, attempt]);
 
   if (useLocalMode) {
-    return <NotesWorkspace userId={null} email={null} adapter={null} />;
+    return <NotesWorkspace userId={null} email={null} adapter={null} client={null} />;
   }
 
   const continueOffline = () => {
@@ -789,6 +848,7 @@ function CloudWorkspace({
       userId={session.user.id}
       email={session.user.email ?? null}
       adapter={adapter}
+      client={client}
       onSignOut={async () => {
         const { error } = await client.auth.signOut();
         if (error) throw error;
@@ -812,14 +872,15 @@ export function TetherApp() {
 
   if (boot.client === null || forceLocalMode) {
     if (boot.error) console.warn(boot.error);
-    return (
-      <NotesWorkspace
-        userId={null}
-        email={null}
-        adapter={null}
-        bootWarning={boot.error}
-      />
-    );
+      return (
+        <NotesWorkspace
+          userId={null}
+          email={null}
+          adapter={null}
+          client={null}
+          bootWarning={boot.error}
+        />
+      );
   }
 
   return (

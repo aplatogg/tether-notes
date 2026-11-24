@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Bell, CalendarDays, FileText, Folder, Lock, Pin, UsersRound } from "lucide-react";
 import { CalendarView } from "@/components/notes/calendar-view";
 import { bodyToPlainText } from "@/lib/notes/rich";
@@ -15,6 +16,10 @@ interface NoteListProps {
   scope: NoteScope;
   selectedTag: string | null;
   selectedFolder: string | null;
+  shareGroups: string[];
+  selectedShareGroup: string | null;
+  onShareGroupSelect: (group: string) => void;
+  onAssignShareGroup: (note: Note, group: string, autogroup: boolean) => void;
   showCalendar: boolean;
   calendarDay: string | null;
   calendarNotes: Note[];
@@ -74,6 +79,10 @@ export function NoteList({
   scope,
   selectedTag,
   selectedFolder,
+  shareGroups,
+  selectedShareGroup,
+  onShareGroupSelect,
+  onAssignShareGroup,
   showCalendar,
   calendarDay,
   calendarNotes,
@@ -85,6 +94,16 @@ export function NoteList({
   onCreate,
   hiddenOnMobile,
 }: NoteListProps) {
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [pickerValue, setPickerValue] = useState("");
+  const [pickerAuto, setPickerAuto] = useState(false);
+
+  function openPicker(note: Note) {
+    setPickerFor(note.id);
+    setPickerValue(note.shareGroup?.trim() ?? "");
+    setPickerAuto(false);
+  }
+
   return (
     <section
       className="note-list-pane"
@@ -129,6 +148,18 @@ export function NoteList({
           <button type="button" onClick={() => onFolderSelect("")}>Clear</button>
         </div>
       ) : null}
+      {selectedShareGroup ? (
+        <div className="active-filter">
+          <span>Group: {selectedShareGroup}</span>
+          <button type="button" onClick={() => onShareGroupSelect("")}>Clear</button>
+        </div>
+      ) : null}
+
+      <datalist id="share-group-options">
+        {shareGroups.map((group) => (
+          <option key={group} value={group} />
+        ))}
+      </datalist>
 
       <div className="note-list" role="list" aria-busy={isLoading}>
         {isLoading ? (
@@ -169,9 +200,75 @@ export function NoteList({
                       <Folder aria-hidden="true" /> {note.folder.trim()}
                     </button>
                   ) : null}
+                  {note.shared ? (
+                    <button
+                      type="button"
+                      className="folder-chip share-group-chip"
+                      title="Assign a share group"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openPicker(note);
+                      }}
+                    >
+                      <UsersRound aria-hidden="true" /> {note.shareGroup?.trim() || "Group"}
+                    </button>
+                  ) : null}
                   <span>{formatUpdatedAt(note.updatedAt)}</span>
                 </span>
               </button>
+              {note.shared && pickerFor === note.id ? (
+                <form
+                  className="share-group-picker"
+                  onClick={(event) => event.stopPropagation()}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    onAssignShareGroup(note, pickerValue.trim(), pickerAuto);
+                    setPickerFor(null);
+                  }}
+                >
+                  <input
+                    type="text"
+                    list="share-group-options"
+                    aria-label="Group name"
+                    placeholder="Group name (e.g. Kerja)"
+                    value={pickerValue}
+                    onChange={(event) => setPickerValue(event.target.value)}
+                    autoFocus
+                  />
+                  {note.ownerEmail ? (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={pickerAuto}
+                        onChange={(event) => setPickerAuto(event.target.checked)}
+                      />
+                      Auto-group everything from {note.ownerEmail}
+                    </label>
+                  ) : null}
+                  <div className="share-group-picker-actions">
+                    <button type="submit" className="secondary-button">Save</button>
+                    {note.shareGroup?.trim() ? (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => {
+                          onAssignShareGroup(note, "", false);
+                          setPickerFor(null);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => setPickerFor(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : null}
               {note.tags.length > 0 ? (
                 <span className="note-row-tags" aria-label="Tags">
                   {note.tags.slice(0, 2).map((tag) => (

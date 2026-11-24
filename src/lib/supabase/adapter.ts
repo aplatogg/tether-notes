@@ -76,7 +76,44 @@ export function remoteRowToNote(value: unknown, currentUserId?: string): Note {
     shared,
     sharedFor: shared ? (currentUserId ?? null) : null,
     ownerEmail: null,
+    shareGroup: null,
   };
+}
+
+interface ShareMeta {
+  ownerEmailByNote: Map<string, string>;
+  groupByNote: Map<string, string>;
+}
+
+/** Fetches owner emails and effective group labels for notes shared with the current user. */
+async function fetchShareMeta(client: SupabaseClient): Promise<ShareMeta> {
+  const owners = await client.rpc("my_shared_note_owners");
+  if (owners.error) throw new Error(owners.error.message);
+
+  const groups = await client.rpc("my_shared_note_groups");
+  if (groups.error) throw new Error(groups.error.message);
+
+  return {
+    ownerEmailByNote: new Map<string, string>(
+      (owners.data ?? []).map((row: { note_id: string; owner_email: string }) => [
+        row.note_id,
+        row.owner_email,
+      ]),
+    ),
+    groupByNote: new Map<string, string>(
+      (groups.data ?? []).map((row: { note_id: string; group_name: string }) => [
+        row.note_id,
+        row.group_name,
+      ]),
+    ),
+  };
+}
+
+function applyShareMeta(note: Note, meta: ShareMeta): Note {
+  if (!note.shared) return note;
+  note.ownerEmail = meta.ownerEmailByNote.get(note.id) ?? null;
+  note.shareGroup = meta.groupByNote.get(note.id) ?? null;
+  return note;
 }
 
 export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
@@ -99,22 +136,9 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
 
       throwIfError(error);
 
-      const owners = await client.rpc("my_shared_note_owners");
-      if (owners.error) throw new Error(owners.error.message);
-      const ownerEmailByNote = new Map<string, string>(
-        (owners.data ?? []).map((row: { note_id: string; owner_email: string }) => [
-          row.note_id,
-          row.owner_email,
-        ]),
-      );
+      const meta = await fetchShareMeta(client);
 
-      return (data ?? []).map((row) => {
-        const note = remoteRowToNote(row, userId);
-        if (note.shared) {
-          note.ownerEmail = ownerEmailByNote.get(note.id) ?? null;
-        }
-        return note;
-      });
+      return (data ?? []).map((row) => applyShareMeta(remoteRowToNote(row, userId), meta));
     },
 
     upsert: write,
@@ -138,7 +162,15 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
             }
 
             try {
-              void onRemoteNote(remoteRowToNote(payload.new, userId));
+              const note = remoteRowToNote(payload.new, userId);
+              if (note.shared) {
+                // Enrich shared notes with owner email + group label.
+                void fetchShareMeta(client)
+                  .then((meta) => onRemoteNote(applyShareMeta(note, meta)))
+                  .catch(onError);
+              } else {
+                void onRemoteNote(note);
+              }
             } catch (error) {
               onError(error);
             }
