@@ -109,7 +109,6 @@ export function grantedRowToNote(value: unknown, currentUserId?: string): Note {
       created_at: timestampSchema,
       updated_at: timestampSchema,
     })
-    .strict()
     .parse(value);
 
   return {
