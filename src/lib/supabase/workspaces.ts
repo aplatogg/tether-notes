@@ -95,6 +95,12 @@ export async function leaveWorkspace(client: SupabaseClient, workspaceId: string
   if (error) throw new Error(error.message);
 }
 
+/** Owner-only. Notes are kept and become personal (workspace_id set null by FK). */
+export async function deleteWorkspace(client: SupabaseClient, workspaceId: string): Promise<void> {
+  const { error } = await client.rpc("delete_workspace", { p_workspace_id: workspaceId });
+  if (error) throw new Error(error.message);
+}
+
 export async function listWorkspaceMembers(
   client: SupabaseClient,
   workspaceId: string,

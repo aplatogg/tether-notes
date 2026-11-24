@@ -70,6 +70,7 @@ import {
   acceptWorkspaceInvite,
   createWorkspace,
   declineWorkspaceInvite,
+  deleteWorkspace,
   inviteWorkspaceMember,
   leaveWorkspace,
   listMyInvites,
@@ -172,6 +173,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [membersBusy, setMembersBusy] = useState(false);
+  const [confirmDeleteWs, setConfirmDeleteWs] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -575,6 +577,23 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     try {
       await removeWorkspaceMember(client, membersDialog.id, member.userId);
       setMembers(await listWorkspaceMembers(client, membersDialog.id));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMembersBusy(false);
+    }
+  }
+
+  async function handleDeleteWorkspace() {
+    if (!client || !membersDialog) return;
+    setMembersBusy(true);
+    setWorkspaceError(null);
+    try {
+      await deleteWorkspace(client, membersDialog.id);
+      await refreshWorkspaces();
+      setMembersDialog(null);
+      setConfirmDeleteWs(false);
+      if (selectedWorkspace === membersDialog.id) setSelectedWorkspace(null);
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1029,13 +1048,42 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
             )}
             {workspaceError ? <p className="form-error" role="alert">{workspaceError}</p> : null}
             <div className="pin-actions">
-              {membersDialog.role !== "owner" ? (
+              {membersDialog.role === "owner" ? (
+                confirmDeleteWs ? (
+                  <>
+                    <button
+                      type="button"
+                      className="danger-link"
+                      disabled={membersBusy}
+                      onClick={() => void handleDeleteWorkspace()}
+                    >
+                      {membersBusy ? "Deleting…" : "Confirm delete"}
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => setConfirmDeleteWs(false)}>
+                      Keep it
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="danger-link"
+                    onClick={() => setConfirmDeleteWs(true)}
+                  >
+                    Delete workspace…
+                  </button>
+                )
+              ) : (
                 <button type="button" className="danger-link" disabled={membersBusy} onClick={() => void handleLeaveWorkspace()}>
                   Leave workspace
                 </button>
-              ) : null}
-              <button type="button" className="secondary-button" onClick={() => setMembersDialog(null)}>Close</button>
+              )}
+              <button type="button" className="secondary-button" onClick={() => { setMembersDialog(null); setConfirmDeleteWs(false); }}>Close</button>
             </div>
+            {confirmDeleteWs ? (
+              <p className="form-error" role="alert">
+                Deleting removes the workspace for everyone. Notes are kept and become personal.
+              </p>
+            ) : null}
           </div>
         </div>
       ) : null}
