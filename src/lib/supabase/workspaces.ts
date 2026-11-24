@@ -101,6 +101,19 @@ export async function deleteWorkspace(client: SupabaseClient, workspaceId: strin
   if (error) throw new Error(error.message);
 }
 
+/** Owner-only rename. */
+export async function renameWorkspace(
+  client: SupabaseClient,
+  workspaceId: string,
+  name: string,
+): Promise<void> {
+  const { error } = await client.rpc("rename_workspace", {
+    p_workspace_id: workspaceId,
+    p_name: name,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function listWorkspaceMembers(
   client: SupabaseClient,
   workspaceId: string,

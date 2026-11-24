@@ -22,6 +22,7 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  Pencil,
   Pin,
   Plus,
   Search,
@@ -77,6 +78,7 @@ import {
   listMyWorkspaces,
   listWorkspaceMembers,
   removeWorkspaceMember,
+  renameWorkspace,
   type Workspace,
   type WorkspaceInvite,
   type WorkspaceMember,
@@ -175,6 +177,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [membersBusy, setMembersBusy] = useState(false);
   const [confirmDeleteWs, setConfirmDeleteWs] = useState(false);
   const [confirmDeleteRow, setConfirmDeleteRow] = useState<string | null>(null);
+  const [editingWs, setEditingWs] = useState<{ id: string; name: string } | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -588,6 +591,18 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     }
   }
 
+  async function handleRenameWorkspace() {
+    if (!client || !editingWs || !editingWs.name.trim()) return;
+    setWorkspaceError(null);
+    try {
+      await renameWorkspace(client, editingWs.id, editingWs.name.trim());
+      await refreshWorkspaces();
+      setEditingWs(null);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function handleDeleteWorkspaceById(workspaceId: string) {
     if (!client) return;
     setWorkspaceError(null);
@@ -871,14 +886,48 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
             </button>
             {workspaces.map((ws) => (
               <div className="workspace-row" key={ws.id}>
-                <button
-                  className={selectedWorkspace === ws.id ? "is-active" : undefined}
-                  type="button"
-                  onClick={() => handleWorkspaceSelect(ws.id)}
-                >
-                  <span>{ws.name}</span>
-                  <span className="num">{workspaceCounts.get(ws.id) ?? 0}</span>
-                </button>
+                {editingWs?.id === ws.id ? (
+                  <form
+                    className="new-group-form workspace-rename"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void handleRenameWorkspace();
+                    }}
+                  >
+                    <input
+                      type="text"
+                      aria-label="Rename workspace"
+                      maxLength={60}
+                      autoFocus
+                      value={editingWs.name}
+                      onChange={(event) =>
+                        setEditingWs({ id: ws.id, name: event.target.value })
+                      }
+                    />
+                    <button type="submit" className="workspace-manage" aria-label="Save name" title="Save">
+                      <Check aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="workspace-manage"
+                      aria-label="Cancel rename"
+                      title="Cancel"
+                      onClick={() => setEditingWs(null)}
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    className={selectedWorkspace === ws.id ? "is-active" : undefined}
+                    type="button"
+                    onClick={() => handleWorkspaceSelect(ws.id)}
+                  >
+                    <span>{ws.name}</span>
+                    <span className="num">{workspaceCounts.get(ws.id) ?? 0}</span>
+                  </button>
+                )}
+                {editingWs?.id === ws.id ? null : (
                 <button
                   type="button"
                   className="workspace-manage"
@@ -888,6 +937,18 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
                 >
                   <UsersRound aria-hidden="true" />
                 </button>
+                )}
+                {ws.role === "owner" && editingWs?.id !== ws.id ? (
+                  <button
+                    type="button"
+                    className="workspace-manage"
+                    aria-label={`Rename ${ws.name}`}
+                    title="Rename workspace"
+                    onClick={() => setEditingWs({ id: ws.id, name: ws.name })}
+                  >
+                    <Pencil aria-hidden="true" />
+                  </button>
+                ) : null}
                 {ws.role === "owner" ? (
                   confirmDeleteRow === ws.id ? (
                     <button

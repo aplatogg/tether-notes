@@ -2292,6 +2292,19 @@ button:disabled {
   font-weight: 700;
 }
 
+.workspace-rename {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.workspace-rename input {
+  flex: 1;
+  min-width: 0;
+}
+
 .new-group-button {
   margin-left: auto;
   width: 22px;
