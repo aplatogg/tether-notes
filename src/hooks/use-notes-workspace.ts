@@ -84,11 +84,18 @@ export function useNotesWorkspace(
   const [serverNotes, setServerNotes] = useState<Note[] | null>(null);
 
   const applyPulled = useEffectEvent((pulled: Note[]) => {
-    setServerNotes(
-      [...pulled].sort(
+    setServerNotes(() => {
+      const merged = new Map(pulled.map((note) => [note.id, note]));
+      // The engine pulls before it pushes, so its snapshot can predate a local
+      // write made moments ago. Unconfirmed local rows win until the server
+      // confirms them, otherwise a freshly trashed note flickers back to live.
+      for (const local of localNotes ?? []) {
+        if (local.syncStatus !== "synced") merged.set(local.id, local);
+      }
+      return [...merged.values()].sort(
         (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      ),
-    );
+      );
+    });
   });
 
   const applyRemoteEvent = useEffectEvent((event: RemoteEvent) => {

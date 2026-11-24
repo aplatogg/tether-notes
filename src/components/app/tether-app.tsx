@@ -523,9 +523,9 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     }
   }
 
-  async function handleDeleteForever() {
+async function handleDeleteForever() {
     if (!activeDraft) return;
-    window.confirm("Delete this note permanently? This cannot be undone.");
+    if (!window.confirm("Delete this note permanently? This cannot be undone.")) return;
     try {
       await workspace.deleteForever(activeDraft.id);
       setDraft(null);
