@@ -92,16 +92,19 @@ export function NoteEditor({
   ) {
     if (!note) return;
     const textarea = bodyRef.current;
-    const start = textarea?.selectionStart ?? note.body.length;
-    const end = textarea?.selectionEnd ?? note.body.length;
-    const result = transform(note.body, start, end);
+    // The textarea is uncontrolled, so the DOM is the source of truth while typing.
+    const current = textarea ? textarea.value : note.body;
+    const start = textarea?.selectionStart ?? current.length;
+    const end = textarea?.selectionEnd ?? current.length;
+    const result = transform(current, start, end);
+
     onChange({ body: result.body });
 
-    window.requestAnimationFrame(() => {
-      if (!textarea) return;
+    if (textarea) {
+      textarea.value = result.body;
       textarea.focus();
       textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
-    });
+    }
   }
 
   function formatBlock(type: Parameters<typeof applyBlockStyle>[3]) {
@@ -304,9 +307,10 @@ export function NoteEditor({
               <div className="editor-fields">
                 <label className="sr-only" htmlFor="note-title">Note title</label>
                 <input
+                  key={`title-${note.id}`}
                   id="note-title"
                   className="title-input"
-                  value={note.title}
+                  defaultValue={note.title}
                   onChange={(event) => onChange({ title: event.target.value })}
                   placeholder="Untitled note"
                   autoComplete="off"
@@ -372,10 +376,11 @@ export function NoteEditor({
                   <>
                     <label className="sr-only" htmlFor="note-body">Note body</label>
                     <textarea
+                      key={`body-${note.id}`}
                       id="note-body"
                       ref={bodyRef}
                       className="body-input"
-                      value={note.body}
+                      defaultValue={note.body}
                       onChange={(event) => onChange({ body: event.target.value })}
                       placeholder="Start writing. H heading, H2 subheading, lists, checklists, **bold**, `code`, and ``` code blocks."
                     />
@@ -390,8 +395,9 @@ export function NoteEditor({
               <footer className="editor-footer">
                 <label htmlFor="note-tags">Tags</label>
                 <input
+                  key={`tags-${note.id}`}
                   id="note-tags"
-                  value={note.tags.join(", ")}
+                  defaultValue={note.tags.join(", ")}
                   onChange={(event) => onChange({ tags: event.target.value.split(",") })}
                   onBlur={commitTags}
                   onKeyDown={(event) => {
@@ -455,5 +461,6 @@ export function NoteEditor({
     </section>
   );
 }
+
 
 
