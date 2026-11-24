@@ -1715,3 +1715,137 @@ button:disabled {
 .share-sheet .note-preview {
   margin-top: 10px;
 }
+
+/* ---------- desktop mini window ---------- */
+.mini-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  gap: 10px;
+}
+
+.mini-loading {
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.mini-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.mini-brand {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.mini-sync {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.mini-open {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+  gap: 3px;
+}
+
+.mini-open svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mini-input {
+  min-height: 96px;
+  flex: 1;
+  padding: 10px 11px;
+  border: 1px solid var(--sheet-border);
+  border-radius: 8px;
+  outline: 0;
+  resize: none;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.mini-input:focus {
+  border-color: var(--accent);
+}
+
+.mini-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mini-hint {
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.mini-save {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 14px;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.mini-save svg {
+  width: 13px;
+  height: 13px;
+}
+
+.mini-recent {
+  display: flex;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  gap: 6px;
+}
+
+.mini-recent-label {
+  width: 100%;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mini-recent button {
+  max-width: 100%;
+  padding: 3px 8px;
+  overflow: hidden;
+  border: 1px solid var(--sheet-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-warn {
+  color: #8a6a12;
+  font-size: 10px;
+}
