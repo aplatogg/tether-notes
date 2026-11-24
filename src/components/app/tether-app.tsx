@@ -121,7 +121,8 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
 
   const storedSelected = workspace.notes?.find((note) => note.id === selectedId);
   const candidateDraft = isDirty ? draft : (storedSelected ?? draft);
-  const activeDraft = candidateDraft?.deletedAt === null ? candidateDraft : null;
+  // Trashed notes stay selectable so the editor can offer restore / delete forever.
+  const activeDraft = candidateDraft;
 
   const notesWithDraft = useMemo(() => {
     const notes = workspace.notes ?? [];
@@ -682,6 +683,7 @@ export function TetherApp() {
     <CloudWorkspace client={boot.client} onUseLocalMode={() => setForceLocalMode(true)} />
   );
 }
+
 
 
 
