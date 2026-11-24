@@ -174,6 +174,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [inviteEmail, setInviteEmail] = useState("");
   const [membersBusy, setMembersBusy] = useState(false);
   const [confirmDeleteWs, setConfirmDeleteWs] = useState(false);
+  const [confirmDeleteRow, setConfirmDeleteRow] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -505,8 +506,11 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   }
 
   function handleFolderSelect(folder: string) {
+    // Groups and workspaces are alternative views: selecting one clears the other
+    // so the two filters never silently stack into an empty list.
     setSelectedFolder(folder || null);
     setFolderCleared(!folder);
+    setSelectedWorkspace(null);
     setMobilePane("list");
     setNavOpen(false);
   }
@@ -581,6 +585,19 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
       setWorkspaceError(error instanceof Error ? error.message : String(error));
     } finally {
       setMembersBusy(false);
+    }
+  }
+
+  async function handleDeleteWorkspaceById(workspaceId: string) {
+    if (!client) return;
+    setWorkspaceError(null);
+    try {
+      await deleteWorkspace(client, workspaceId);
+      await refreshWorkspaces();
+      if (selectedWorkspace === workspaceId) setSelectedWorkspace(null);
+      setConfirmDeleteRow(null);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -871,6 +888,29 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
                 >
                   <UsersRound aria-hidden="true" />
                 </button>
+                {ws.role === "owner" ? (
+                  confirmDeleteRow === ws.id ? (
+                    <button
+                      type="button"
+                      className="workspace-manage workspace-delete-confirm"
+                      aria-label={`Confirm delete ${ws.name}`}
+                      title="Confirm delete"
+                      onClick={() => void handleDeleteWorkspaceById(ws.id)}
+                    >
+                      <Check aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="workspace-manage"
+                      aria-label={`Delete ${ws.name}`}
+                      title="Delete workspace"
+                      onClick={() => setConfirmDeleteRow(ws.id)}
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  )
+                ) : null}
               </div>
             ))}
           </div>

@@ -2287,6 +2287,11 @@ button:disabled {
   color: inherit;
 }
 
+.workspace-delete-confirm {
+  color: #b42318;
+  font-weight: 700;
+}
+
 .new-group-button {
   margin-left: auto;
   width: 22px;

@@ -75,6 +75,18 @@ function emptyMessage(scope: NoteScope, query: string, selectedTag: string | nul
   return "Capture the first thought in this workspace.";
 }
 
+function hasActiveFilters(
+  query: string,
+  selectedTag: string | null,
+  selectedFolder: string | null,
+  selectedShareGroup: string | null,
+  selectedWorkspace: string | null,
+): boolean {
+  return Boolean(
+    query.trim() || selectedTag || selectedFolder || selectedShareGroup || selectedWorkspace,
+  );
+}
+
 export function NoteList({
   notes,
   selectedId,
@@ -310,7 +322,11 @@ export function NoteList({
         ) : (
           <div className="list-empty-state">
             <FileText aria-hidden="true" />
-            <p>{emptyMessage(scope, query, selectedTag)}</p>
+            <p>
+              {hasActiveFilters(query, selectedTag, selectedFolder, selectedShareGroup, selectedWorkspace)
+                ? "No notes match the current filters. Clear a filter (the chips above the list) to see more."
+                : emptyMessage(scope, query, selectedTag)}
+            </p>
             {scope === "all" && !query.trim() && !selectedTag ? (
               <button className="secondary-button" type="button" onClick={onCreate}>
                 Create a note
