@@ -287,6 +287,29 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, userId]);
 
+  // Live-refresh the workspace list + invite inbox when our membership rows change
+  // (invited / accepted / removed), so an already-open session sees it without reload.
+  useEffect(() => {
+    if (!client || !userId) return;
+    const channel = client
+      .channel(`workspace-list:${userId}:${globalThis.crypto.randomUUID()}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "workspace_members",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => void refreshWorkspaces(),
+      )
+      .subscribe();
+    return () => {
+      void client.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, userId]);
+
   async function handleAcceptInvite(invite: WorkspaceInvite) {
     if (!client) return;
     setWorkspaceError(null);
