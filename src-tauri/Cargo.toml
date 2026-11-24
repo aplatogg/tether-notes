@@ -1,6 +1,6 @@
 [package]
 name = "tether-notes"
-version = "0.3.2"
+version = "0.3.3"
 description = "Tether Notes desktop shell"
 authors = ["Tether Notes"]
 edition = "2021"
