@@ -225,6 +225,15 @@ export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps)
     return () => window.removeEventListener("keydown", handler);
   }, [editor, onSaveShortcut]);
 
+  // Remote updates (Realtime from another device) refresh the document only while
+  // this editor is unfocused, so typing never loses the caret.
+  useEffect(() => {
+    if (!editor || editor.isFocused) return;
+    const incoming = markdownToHtml(value);
+    if (incoming !== editor.getHTML()) {
+      editor.commands.setContent(incoming, { emitUpdate: false });
+    }
+  }, [editor, value]);
   if (!editor) {
     return <div className="rich-editor-skeleton" aria-hidden="true" />;
   }
@@ -242,6 +251,7 @@ export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps)
     </div>
   );
 }
+
 
 
 
