@@ -191,7 +191,7 @@ async function pullNotes(client: SupabaseClient, userId: string): Promise<Note[]
   const own = (ownRes.data ?? []).map((row) =>
     applyShareMeta(remoteRowToNote(row, userId), meta),
   );
-  const granted = (grantedRes.data ?? []).map((row) =>
+  const granted = (grantedRes.data ?? []).map((row: unknown) =>
     applyShareMeta(grantedRowToNote(row, userId), meta),
   );
 
