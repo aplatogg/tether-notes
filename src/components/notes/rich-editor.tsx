@@ -43,7 +43,41 @@ const TabKeymap = Extension.create({
         if (editor.isActive("table")) return editor.commands.goToNextCell();
         if (editor.can().sinkListItem("taskItem")) return editor.commands.sinkListItem("taskItem");
         if (editor.can().sinkListItem("listItem")) return editor.commands.sinkListItem("listItem");
-        return editor.commands.insertContent("\u00A0\u00A0\u00A0\u00A0");
+        // In prose Tab stays inert instead of inserting loose spaces.
+        return true;
+      },
+      Enter: () => {
+        const { editor } = this;
+        if (!editor.isActive("taskItem")) return false;
+
+        const { state } = editor;
+        const { $from } = state.selection;
+        const item = $from.node($from.depth - 1);
+        if (!item || item.type.name !== "taskItem") return false;
+
+        // An empty checklist item used to end the list; keep the checkbox alive.
+        if (item.textContent.trim().length === 0) {
+          return editor.commands.splitListItem("taskItem");
+        }
+
+        return false;
+      },
+      Backspace: () => {
+        const { editor } = this;
+        const { selection } = editor.state;
+        if (!selection.empty) return false;
+
+        const { $from } = selection;
+        if ($from.parentOffset !== 0) return false;
+
+        if (editor.isActive("taskItem") && $from.depth > 2) {
+          return editor.commands.liftListItem("taskItem");
+        }
+        if (editor.isActive("listItem") && $from.depth > 2) {
+          return editor.commands.liftListItem("listItem");
+        }
+
+        return false;
       },
       "Shift-Tab": () => {
         const { editor } = this;
@@ -276,6 +310,7 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
     </div>
   );
 }
+
 
 
 
