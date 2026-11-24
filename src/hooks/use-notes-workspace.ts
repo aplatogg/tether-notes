@@ -143,6 +143,9 @@ export function useNotesWorkspace(
     });
     const handleConnectionChange = () => void engine.sync();
     const handleFocus = () => void engine.sync();
+    // Realtime note/delete arrivals also re-pull so the server-driven list
+    // reflects them immediately.
+    const offRemote = engine.onRemote(() => setSyncTick((tick) => tick + 1));
 
     window.addEventListener("online", handleConnectionChange);
     window.addEventListener("offline", handleConnectionChange);
@@ -151,6 +154,7 @@ export function useNotesWorkspace(
 
     return () => {
       unsubscribe();
+      offRemote();
       window.removeEventListener("online", handleConnectionChange);
       window.removeEventListener("offline", handleConnectionChange);
       window.removeEventListener("focus", handleFocus);

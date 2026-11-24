@@ -47,6 +47,7 @@ function errorMessage(error: unknown): string {
 
 export class SyncEngine {
   private readonly listeners = new Set<StateListener>();
+  private readonly remoteListeners = new Set<() => void>();
   private readonly maxAttempts: number;
   private readonly retryDelayMs: (attempt: number) => number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
@@ -85,6 +86,14 @@ export class SyncEngine {
     return () => this.listeners.delete(listener);
   }
 
+  /** Fires whenever a realtime remote note/delete arrives. */
+  onRemote(listener: () => void): () => void {
+    this.remoteListeners.add(listener);
+    return () => {
+      this.remoteListeners.delete(listener);
+    };
+  }
+
   async start(): Promise<void> {
     await this.sync();
 
@@ -97,6 +106,7 @@ export class SyncEngine {
       async (note) => {
         await this.repository.mergeRemote(note);
         await this.refreshPendingState();
+        for (const listener of this.remoteListeners) listener();
       },
       (error) => {
         this.setState({
@@ -115,6 +125,7 @@ export class SyncEngine {
           await this.repository.hardDelete(noteId);
         }
         await this.refreshPendingState();
+        for (const listener of this.remoteListeners) listener();
       },
     );
   }

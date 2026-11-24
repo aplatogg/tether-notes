@@ -261,6 +261,34 @@ describe("SyncEngine", () => {
     expect(released).toBe(true);
   });
 
+  test("onRemote listeners fire when a realtime note arrives", async () => {
+    let onRemote: ((note: Note) => void | Promise<void>) | undefined;
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        subscribe: (_userId, noteListener) => {
+          onRemote = noteListener;
+          return () => undefined;
+        },
+      }),
+      USER_ID,
+      { sleep: async () => undefined },
+    );
+    let fired = 0;
+    const off = engine.onRemote(() => {
+      fired += 1;
+    });
+
+    await engine.start();
+    await onRemote?.(makeNote({ id: "live-2", updatedAt: "2026-11-25T00:00:00.000Z" }));
+
+    expect(fired).toBe(1);
+    off();
+    await onRemote?.(makeNote({ id: "live-3", updatedAt: "2026-11-25T00:00:00.000Z" }));
+    expect(fired).toBe(1);
+    await engine.stop();
+  });
+
   test("prunes local rows that vanished from the remote pull", async () => {
     await repository.applyRemoteUpsert(
       makeNote({ id: "still-there", syncStatus: "synced" }),
