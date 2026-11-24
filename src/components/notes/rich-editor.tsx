@@ -34,7 +34,6 @@ import {
 import { countWords, markdownToHtml } from "@/lib/notes/rich";
 
 interface RichEditorProps {
-  noteId: string;
   value: string;
   onChange: (html: string) => void;
   onSaveShortcut?: () => void;
@@ -190,7 +189,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-export function RichEditor({ noteId, value, onChange, onSaveShortcut }: RichEditorProps) {
+export function RichEditor({ value, onChange, onSaveShortcut }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -231,16 +230,18 @@ export function RichEditor({ noteId, value, onChange, onSaveShortcut }: RichEdit
   }
 
   return (
-    <div className="rich-editor" key={noteId}>
+    <div className="rich-editor">
       <Toolbar editor={editor} />
       <div className="rich-editor-scroll">
         <EditorContent editor={editor} />
       </div>
       <div className="rich-footer">
         <span>{countWords(editor.getHTML())} words</span>
-        <span>{editor.storage.characterCount ? "" : ""}</span>
+
       </div>
     </div>
   );
 }
+
+
 

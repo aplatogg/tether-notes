@@ -268,7 +268,7 @@ export function NoteEditor({
                   maxLength={500}
                 />
                 <RichEditor
-                  noteId={note.id}
+                  key={note.id}
                   value={note.body}
                   onChange={(html) => onChange({ body: html })}
                   onSaveShortcut={onSave}
@@ -344,3 +344,5 @@ export function NoteEditor({
     </section>
   );
 }
+
+
