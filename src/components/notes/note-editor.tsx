@@ -204,7 +204,7 @@ export function NoteEditor({
           {note.deletedAt ? (
             <div className="trash-banner" role="status">
               <span>
-                In trash · deleted {trashDaysLeft(note) <= 0 ? "today" : `${trashDaysLeft(note)} days left`}
+                {trashDaysLeft(note) <= 0 ? "In trash · deleting now" : `In trash · ${trashDaysLeft(note)} days left before permanent deletion`}
               </span>
               <button type="button" onClick={onRestore}>Restore</button>
               <button type="button" className="danger-link" onClick={onDeleteForever}>Delete forever</button>
@@ -360,6 +360,7 @@ export function NoteEditor({
     </section>
   );
 }
+
 
 
 
