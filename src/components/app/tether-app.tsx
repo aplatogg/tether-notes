@@ -509,6 +509,16 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setNavOpen(false);
   }
 
+  function handleWorkspaceSelect(workspaceId: string | null) {
+    // Switching workspace switches the whole view: reset the group filter so
+    // the list isn't accidentally empty.
+    setSelectedWorkspace(workspaceId);
+    setSelectedFolder(null);
+    setFolderCleared(true);
+    setMobilePane("list");
+    setNavOpen(false);
+  }
+
   async function handleCreateWorkspace() {
     if (!client || !newWorkspaceName.trim()) return;
     setWorkspaceError(null);
@@ -798,11 +808,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
             <button
               className={selectedWorkspace === null ? "is-active" : undefined}
               type="button"
-              onClick={() => {
-                setSelectedWorkspace(null);
-                setMobilePane("list");
-                setNavOpen(false);
-              }}
+              onClick={() => handleWorkspaceSelect(null)}
             >
               <span>Personal</span>
               <span className="num">{personalCount}</span>
@@ -812,11 +818,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
                 <button
                   className={selectedWorkspace === ws.id ? "is-active" : undefined}
                   type="button"
-                  onClick={() => {
-                    setSelectedWorkspace(ws.id);
-                    setMobilePane("list");
-                    setNavOpen(false);
-                  }}
+                  onClick={() => handleWorkspaceSelect(ws.id)}
                 >
                   <span>{ws.name}</span>
                   <span className="num">{workspaceCounts.get(ws.id) ?? 0}</span>
@@ -1129,6 +1131,8 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
               shareGroups={shareGroups}
               selectedShareGroup={selectedShareGroup}
               workspaces={workspaces}
+              selectedWorkspace={selectedWorkspace}
+              onWorkspaceSelect={handleWorkspaceSelect}
               onShareGroupSelect={handleShareGroupSelect}
               onAssignShareGroup={(note, group, autogroup) =>
                 void handleAssignShareGroup(note, group, autogroup)

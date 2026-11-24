@@ -22,6 +22,8 @@ interface NoteListProps {
   onShareGroupSelect: (group: string) => void;
   onAssignShareGroup: (note: Note, group: string, autogroup: boolean) => void;
   workspaces: Workspace[];
+  selectedWorkspace: string | null;
+  onWorkspaceSelect: (workspaceId: string | null) => void;
   showCalendar: boolean;
   calendarDay: string | null;
   calendarNotes: Note[];
@@ -86,6 +88,8 @@ export function NoteList({
   onShareGroupSelect,
   onAssignShareGroup,
   workspaces,
+  selectedWorkspace,
+  onWorkspaceSelect,
   showCalendar,
   calendarDay,
   calendarNotes,
@@ -155,6 +159,14 @@ export function NoteList({
         <div className="active-filter">
           <span>Group: {selectedShareGroup}</span>
           <button type="button" onClick={() => onShareGroupSelect("")}>Clear</button>
+        </div>
+      ) : null}
+      {selectedWorkspace ? (
+        <div className="active-filter">
+          <span>
+            Workspace: {workspaces.find((w) => w.id === selectedWorkspace)?.name ?? selectedWorkspace}
+          </span>
+          <button type="button" onClick={() => onWorkspaceSelect(null)}>Clear</button>
         </div>
       ) : null}
 
