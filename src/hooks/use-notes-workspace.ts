@@ -64,7 +64,7 @@ export function useNotesWorkspace(
     };
   }, []);
 
-  const notes = useLiveQuery(async () => {
+  const localNotes = useLiveQuery(async () => {
     if (!repository) {
       return undefined;
     }
@@ -76,6 +76,35 @@ export function useNotesWorkspace(
       return [];
     }
   }, [repository, userId, syncTick]);
+
+  // In Supabase mode the server is the display source of truth: re-pull after
+  // every sync so the UI always shows server state, never a stale local cache.
+  // Local-only mode (no adapter) keeps using IndexedDB directly.
+  const [serverNotes, setServerNotes] = useState<Note[] | null>(null);
+  useEffect(() => {
+    if (!adapter || !repository || userId === null) return;
+    let active = true;
+    adapter
+      .pull(userId)
+      .then((pulled) => {
+        if (active) {
+          setServerNotes(
+            [...pulled].sort(
+              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        // Offline or pull failed: keep showing the local cache.
+      });
+    return () => {
+      active = false;
+    };
+  }, [adapter, repository, userId, syncTick]);
+
+  const notes =
+    adapter !== null && userId !== null ? (serverNotes ?? localNotes) : localNotes;
 
   const pending = useLiveQuery(async () => {
     if (!repository) {
