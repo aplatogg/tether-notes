@@ -22,8 +22,8 @@ export function AuthPanel({ client, initialError = null }: AuthPanelProps) {
     setError(null);
     setMessage(null);
 
-    if (password.length < 6) {
-      setError("Use at least 6 characters for your password.");
+    if (password.length < 8) {
+      setError("Use at least 8 characters for your password.");
       return;
     }
 
@@ -122,7 +122,7 @@ export function AuthPanel({ client, initialError = null }: AuthPanelProps) {
             id="password"
             type="password"
             autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-            minLength={6}
+            minLength={8}
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -138,6 +138,9 @@ export function AuthPanel({ client, initialError = null }: AuthPanelProps) {
             {mode === "sign-in" ? "Sign in" : "Create account"}
           </button>
         </form>
+        <p className="auth-foot">
+          <a href="/privacy">Privacy</a>
+        </p>
       </section>
     </main>
   );
