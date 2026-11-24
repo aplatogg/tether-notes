@@ -241,6 +241,8 @@ export function noteDays(note: Note): string[] {
 export function collectFolders(notes: readonly Note[]): string[] {
   const folders = new Set<string>();
   notes.forEach((note) => {
+    // Shared notes are organized via share groups in the shared scope instead.
+    if (note.shared) return;
     const folder = (note.folder ?? "").trim();
     if (folder) folders.add(folder);
   });
@@ -285,7 +287,7 @@ export function folderLabel(path: string): string {
 export function folderTreeCounts(notes: readonly Note[]): Map<string, number> {
   const totals = new Map<string, number>();
   notes.forEach((note) => {
-    if (note.deletedAt !== null) return;
+    if (note.deletedAt !== null || note.shared) return;
     const folder = (note.folder ?? "").trim();
     if (!folder) return;
     const segments = folder.split("/");
