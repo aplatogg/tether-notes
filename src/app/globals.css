@@ -2265,22 +2265,31 @@ button:disabled {
 
 .workspace-row {
   display: flex;
-  align-items: stretch;
-  gap: 2px;
+  align-items: center;
+  gap: 1px;
 }
 
 .workspace-row > button:first-child {
   flex: 1;
   min-width: 0;
+  min-height: 30px;
+  padding: 2px 6px;
 }
 
 .workspace-manage {
-  width: 28px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
   display: inline-grid;
   place-items: center;
   border: 0;
   background: transparent;
   color: var(--muted);
+}
+
+.workspace-manage svg {
+  width: 13px;
+  height: 13px;
 }
 
 .workspace-manage:hover {
