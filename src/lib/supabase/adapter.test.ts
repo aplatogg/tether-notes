@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Note } from "@/lib/notes/types";
-import { combinePulledNotes, grantedRowToNote, noteToRemoteRow, remoteRowToNote } from "./adapter";
+import { combinePulledNotes, createSupabaseSyncAdapter, grantedRowToNote, noteToRemoteRow, remoteRowToNote } from "./adapter";
 
 const note: Note = {
   id: "1c622c7e-6c1d-47d9-a98f-d8c4c8a13247",
@@ -106,6 +106,57 @@ describe("Supabase note mapping", () => {
     expect(combined).toHaveLength(1);
     expect(combined[0].id).toBe(note.id);
     expect(combined[0].shared).toBe(true); // owned by someone else -> shared
+  });
+});
+
+describe("Supabase adapter write guards", () => {
+  type FakeResult = { data: unknown; error: null };
+  function makeClient(results: FakeResult[]) {
+    const calls: string[] = [];
+    const queue = [...results];
+    const next = () => queue.shift() ?? { data: null, error: null };
+    const chain = (kind: string) => {
+      const result = next();
+      calls.push(kind);
+      const api = {
+        eq: () => api,
+        select: () => Promise.resolve(result),
+        maybeSingle: () => Promise.resolve(result),
+        then: (resolve: (v: FakeResult) => unknown) => resolve(result),
+      };
+      return api;
+    };
+    return {
+      calls,
+      from: () => ({
+        upsert: () => Promise.resolve(next()),
+        delete: () => chain("delete"),
+      }),
+    };
+  }
+
+  test("refuses to write a note without an authenticated owner", async () => {
+    const client = makeClient([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adapter = createSupabaseSyncAdapter(client as any);
+    await expect(adapter.upsert({ ...note, userId: null })).rejects.toThrow(
+      "authenticated user",
+    );
+    expect(client.calls).toHaveLength(0);
+  });
+
+  test("reports a purge that RLS silently ignored instead of dropping the row locally", async () => {
+    const client = makeClient([{ data: [], error: null }]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adapter = createSupabaseSyncAdapter(client as any);
+    await expect(adapter.purge?.(note.id)).rejects.toThrow("Only the owner");
+  });
+
+  test("succeeds when the purge actually deleted the row", async () => {
+    const client = makeClient([{ data: [{ id: note.id }], error: null }]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adapter = createSupabaseSyncAdapter(client as any);
+    await expect(adapter.purge?.(note.id)).resolves.toBeUndefined();
   });
 });
 

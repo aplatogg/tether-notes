@@ -216,6 +216,12 @@ async function pullNotes(client: SupabaseClient, userId: string): Promise<Note[]
 
 export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
   const write = async (note: Note): Promise<void> => {
+    // Ownership guard (the server enforces the same invariant via trigger): a
+    // write must never claim a foreign author. Workspace notes carry their real
+    // owner in note.userId, so collaborative edits keep the original author.
+    if (note.userId === null) {
+      throw new Error("Remote sync requires an authenticated user");
+    }
     const { error } = await client
       .from("notes")
       .upsert(noteToRemoteRow(note), { onConflict: "id" });
@@ -231,8 +237,18 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
     softDelete: write,
 
     async purge(noteId) {
-      const { error } = await client.from("notes").delete().eq("id", noteId);
+      // RLS silently deletes 0 rows when the caller is not the owner (workspace
+      // members may only trash). Ask for the deleted rows back so a no-op is
+      // reported instead of pretending the purge succeeded.
+      const { data, error } = await client
+        .from("notes")
+        .delete()
+        .eq("id", noteId)
+        .select("id");
       throwIfError(error);
+      if (!data || data.length === 0) {
+        throw new Error("Only the owner can permanently delete this note");
+      }
     },
 
     subscribe(userId, onRemoteNote, onError, onRemoteDelete) {
