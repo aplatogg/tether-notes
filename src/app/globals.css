@@ -402,6 +402,12 @@ button:disabled {
   background: var(--surface);
 }
 
+.icon-button.is-active {
+  color: #ffffff;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
 .account-button:hover,
 .icon-button:hover {
   background: var(--surface-soft);
@@ -1299,13 +1305,49 @@ button:disabled {
   text-decoration: none;
 }
 
+.nav-toggle {
+  display: none;
+}
+
+.nav-backdrop {
+  display: none;
+}
+
 @media (max-width: 1000px) {
   .app-frame {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .nav-toggle {
+    display: inline-grid;
+    flex: 0 0 auto;
+  }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
   .sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(300px, 82vw);
+    overflow-y: auto;
+    background: var(--surface);
+    border-right: 1px solid var(--sheet-border);
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.25);
+    transform: translateX(-105%);
+    transition: transform 0.18s ease;
+  }
+
+  .sidebar-open {
+    transform: none;
   }
 
   .topbar,

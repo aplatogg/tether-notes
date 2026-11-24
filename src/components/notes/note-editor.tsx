@@ -10,6 +10,7 @@ import {
   LoaderCircle,
   Lock,
   LockOpen,
+  Paperclip,
   Pin,
   PinOff,
   Save,
@@ -86,6 +87,7 @@ export function NoteEditor({
   const [grants, setGrants] = useState<NoteGrantEntry[]>([]);
   const [grantEmail, setGrantEmail] = useState("");
   const [grantBusy, setGrantBusy] = useState(false);
+  const [extrasOpen, setExtrasOpen] = useState(false);
 
   const locked = Boolean(note?.lockHash) && !(note ? unlocked[note.id] : false);
   const readOnly = note?.shared === true;
@@ -247,6 +249,16 @@ export function NoteEditor({
               {noteStateLabel(note, isDirty, isLocalOnly)}
             </span>
             <div className="editor-actions">
+              <button
+                className={extrasOpen ? "icon-button is-active" : "icon-button"}
+                type="button"
+                onClick={() => setExtrasOpen((open) => !open)}
+                aria-label="Toggle attachments and AI summary"
+                aria-pressed={extrasOpen}
+                title="Attachments & AI summary"
+              >
+                <Paperclip aria-hidden="true" />
+              </button>
               {readOnly ? null : (
                 <>
                   <ReminderControl note={note} readOnly={readOnly} onChange={onChange} />
@@ -396,10 +408,12 @@ export function NoteEditor({
                   onChange={(html) => onChange({ body: html })}
                   onSaveShortcut={onSave}
                 />
-                <div className="editor-extras">
-                  <AttachmentsPanel note={note} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
-                  <AiSummaryPanel note={note} readOnly={readOnly} />
-                </div>
+                {extrasOpen ? (
+                  <div className="editor-extras">
+                    <AttachmentsPanel note={note} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
+                    <AiSummaryPanel note={note} readOnly={readOnly} />
+                  </div>
+                ) : null}
               </div>
 
               <footer className="editor-footer">

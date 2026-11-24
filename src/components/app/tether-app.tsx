@@ -20,6 +20,7 @@ import {
   Folder,
   LoaderCircle,
   LogOut,
+  Menu,
   Pin,
   Plus,
   Search,
@@ -145,6 +146,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [draft, setDraft] = useState<Note | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [mobilePane, setMobilePane] = useState<"list" | "editor">("list");
+  const [navOpen, setNavOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -374,22 +376,26 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     setSelectedId(null);
     setDraft(null);
     setMobilePane("list");
+    setNavOpen(false);
   }
 
   function handleTagSelect(tag: string) {
     setSelectedTag(tag || null);
     setMobilePane("list");
+    setNavOpen(false);
   }
 
   function handleFolderSelect(folder: string) {
     setSelectedFolder(folder || null);
     setMobilePane("list");
+    setNavOpen(false);
   }
 
   function handleShareGroupSelect(group: string) {
     setSelectedShareGroup(group || null);
     if (scope !== "shared") setScope("shared");
     setMobilePane("list");
+    setNavOpen(false);
   }
 
   async function handleAssignShareGroup(note: Note, group: string, autogroup: boolean) {
@@ -496,7 +502,14 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
 
   return (
     <main className="app-frame">
-      <aside className="sidebar">
+      {navOpen ? (
+        <div
+          className="nav-backdrop"
+          aria-hidden="true"
+          onClick={() => setNavOpen(false)}
+        />
+      ) : null}
+      <aside className={navOpen ? "sidebar sidebar-open" : "sidebar"}>
         <Brand />
         <button className="new-note-button" type="button" onClick={() => void handleCreate()}>
           <Plus aria-hidden="true" />
@@ -587,6 +600,15 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
       </aside>
 
       <header className="topbar">
+        <button
+          className="icon-button nav-toggle"
+          type="button"
+          aria-label="Open navigation"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen(true)}
+        >
+          <Menu aria-hidden="true" />
+        </button>
         <div className="mobile-brand"><Brand /></div>
         <label className="search-field">
           <Search aria-hidden="true" />
