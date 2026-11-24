@@ -8,7 +8,7 @@ describe("uploadAttachment size guard", () => {
   test("rejects files above the cap", async () => {
     const big = new Blob([new Uint8Array(MAX_ATTACHMENT_BYTES + 1)]);
     await expect(
-      uploadAttachment(stubClient, "note-id", "user-id", big, "big.bin"),
+      uploadAttachment(stubClient, "n", "u", big, "big.bin"),
     ).rejects.toThrow(/too large/i);
   });
 
@@ -18,7 +18,7 @@ describe("uploadAttachment size guard", () => {
     const single = vi.fn().mockResolvedValue({
       data: {
         id: "00000000-0000-4000-8000-000000000001",
-        note_id: "note-id",
+        note_id: "00000000-0000-4000-8000-000000000002",
         path: "p",
         name: "ok.bin",
         mime: "application/octet-stream",
@@ -32,7 +32,13 @@ describe("uploadAttachment size guard", () => {
       from: () => ({ insert: () => ({ select: () => ({ single }) }) }),
     } as never;
 
-    const result = await uploadAttachment(client, "note-id", "user-id", ok, "ok.bin");
+    const result = await uploadAttachment(
+      client,
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+      ok,
+      "ok.bin",
+    );
     expect(result.name).toBe("ok.bin");
     expect(upload).toHaveBeenCalledOnce();
   });
