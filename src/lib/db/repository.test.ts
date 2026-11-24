@@ -585,4 +585,33 @@ describe("NotesRepository", () => {
     expect(await repository.getMetadata("missing")).toBeUndefined();
     expect(await database.notes.count()).toBe(0);
   });
+
+  test("pruneRemoteMissing drops stale rows but keeps pending and other accounts' rows", async () => {
+    // Present remotely: kept.
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "remote-note", syncStatus: "synced" }),
+    );
+    // Stale: hard-deleted on the server, not in the pull → removed.
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "stale-note", syncStatus: "synced" }),
+    );
+    // Pending local edit: not in the pull but protected by the outbox.
+    await repository.localUpsert(makeNote({ id: "pending-note" }));
+    // Another account's row on a shared device: untouched.
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "other-user-note", userId: "user-2", syncStatus: "synced" }),
+    );
+
+    const removed = await repository.pruneRemoteMissing(
+      "user-1",
+      new Set(["remote-note"]),
+    );
+
+    expect(removed).toBe(1);
+    expect(await repository.get("remote-note")).toBeDefined();
+    expect(await repository.get("stale-note")).toBeUndefined();
+    expect(await repository.get("pending-note")).toBeDefined();
+    expect(await repository.get("other-user-note")).toBeDefined();
+    expect(await repository.listOutbox("user-1")).toHaveLength(1);
+  });
 });

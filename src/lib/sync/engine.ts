@@ -27,6 +27,7 @@ export interface SyncAdapter {
     userId: string,
     onRemoteNote: (note: Note) => void | Promise<void>,
     onError: (error: unknown) => void,
+    onRemoteDelete?: (noteId: string) => void | Promise<void>,
   ) => (() => void | Promise<void>) | Promise<() => void | Promise<void>>;
 }
 
@@ -103,6 +104,17 @@ export class SyncEngine {
           phase: "error",
           error: errorMessage(error),
         });
+      },
+      async (noteId) => {
+        // A remote hard delete (e.g. trash purge on another device): drop the
+        // local row too, unless we have a pending local mutation for it.
+        const pending = (await this.repository.listOutbox(this.userId)).some(
+          (mutation) => mutation.noteId === noteId,
+        );
+        if (!pending) {
+          await this.repository.hardDelete(noteId);
+        }
+        await this.refreshPendingState();
       },
     );
   }
@@ -189,6 +201,12 @@ export class SyncEngine {
         await this.repository.mergeRemote(note);
       }
     }
+
+    // Rows that vanished remotely (hard purge) and aren't pending locally.
+    await this.repository.pruneRemoteMissing(
+      this.userId,
+      new Set(remoteNotes.map((note) => note.id)),
+    );
 
     const mutations = await this.repository.listOutbox(this.userId);
     let firstError: unknown;

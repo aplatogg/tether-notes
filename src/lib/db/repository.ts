@@ -498,6 +498,34 @@ export class NotesRepository {
     );
   }
 
+  /**
+   * Removes local rows that no longer exist on the server (hard-purged on
+   * another device) and have no pending outbox mutation. Only rows visible to
+   * this account are considered, so other accounts' rows on a shared device
+   * are left alone.
+   */
+  async pruneRemoteMissing(userId: string | null, remoteIds: ReadonlySet<string>): Promise<number> {
+    const ownerId = userIdSchema.parse(userId);
+    const ownerKey = ownerKeyFor(ownerId);
+
+    return this.database.transaction("rw", this.database.notes, this.database.outbox, async () => {
+      const pendingIds = new Set((await this.database.outbox.toArray()).map((m) => m.noteId));
+      const rows = await this.database.notes.toArray();
+      let removed = 0;
+
+      for (const row of rows) {
+        if (remoteIds.has(row.id) || pendingIds.has(row.id)) continue;
+        const visibleToUser =
+          row.ownerKey === ownerKey || row.sharedFor === ownerId || row.workspaceIndex === 1;
+        if (!visibleToUser) continue;
+        await this.database.notes.delete(row.id);
+        removed += 1;
+      }
+
+      return removed;
+    });
+  }
+
   async listOutbox(userId?: string | null): Promise<OutboxMutation[]> {
     let mutations: OutboxMutation[];
 

@@ -158,7 +158,7 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
       throwIfError(error);
     },
 
-    subscribe(userId, onRemoteNote, onError) {
+    subscribe(userId, onRemoteNote, onError, onRemoteDelete) {
       // No user_id filter: RLS already limits rows to ours plus shared ones.
       const channel = client
         .channel(`notes:${userId}:${globalThis.crypto.randomUUID()}`)
@@ -166,6 +166,15 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
           "postgres_changes",
           { event: "*", schema: "public", table: "notes" },
           (payload) => {
+            // Hard delete (trash purge on another device): drop the local row.
+            if (payload.eventType === "DELETE") {
+              const old = payload.old as { id?: unknown } | null;
+              if (old && typeof old.id === "string") {
+                void onRemoteDelete?.(old.id);
+              }
+              return;
+            }
+
             if (!payload.new || Object.keys(payload.new).length === 0) {
               return;
             }

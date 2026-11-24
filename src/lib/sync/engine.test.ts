@@ -260,4 +260,66 @@ describe("SyncEngine", () => {
     expect((await repository.get("live-note"))?.title).toBe("Live update");
     expect(released).toBe(true);
   });
+
+  test("prunes local rows that vanished from the remote pull", async () => {
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "still-there", syncStatus: "synced" }),
+    );
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "purged-elsewhere", syncStatus: "synced" }),
+    );
+    await repository.localUpsert(makeNote({ id: "pending-new", syncStatus: "local" }));
+
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        pull: async () => [makeNote({ id: "still-there", syncStatus: "synced" })],
+      }),
+      USER_ID,
+      { sleep: async () => undefined },
+    );
+
+    await engine.sync();
+
+    expect(await repository.get("still-there")).toBeDefined();
+    expect(await repository.get("purged-elsewhere")).toBeUndefined();
+    // Pending local creation survives the prune and still flushes.
+    expect(await repository.get("pending-new")).toBeDefined();
+    expect(engine.getState()).toMatchObject({ phase: "synced", pending: 0 });
+  });
+
+  test("hard-deletes locally on a remote delete event unless a mutation is pending", async () => {
+    let onRemoteDelete: ((noteId: string) => void | Promise<void>) | undefined;
+    await repository.applyRemoteUpsert(
+      makeNote({ id: "gone-note", syncStatus: "synced" }),
+    );
+    await repository.localUpsert(makeNote({ id: "busy-note", syncStatus: "local" }));
+
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({
+        // Remote still lists busy-note; the failed push keeps it pending.
+        pull: async () => [makeNote({ id: "busy-note", syncStatus: "synced" })],
+        upsert: async () => {
+          throw new Error("network unavailable");
+        },
+        subscribe: (_userId, _noteListener, _onError, deleteListener) => {
+          onRemoteDelete = deleteListener;
+          return () => undefined;
+        },
+      }),
+      USER_ID,
+      { maxAttempts: 1, sleep: async () => undefined },
+    );
+
+    await engine.start();
+    await onRemoteDelete?.("gone-note");
+    await onRemoteDelete?.("busy-note");
+    await engine.stop();
+
+    expect(await repository.get("gone-note")).toBeUndefined();
+    // Pending mutation protects the row from the remote delete.
+    expect(await repository.get("busy-note")).toBeDefined();
+    expect(await repository.listOutbox(USER_ID)).toHaveLength(1);
+  });
 });
