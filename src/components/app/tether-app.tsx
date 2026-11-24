@@ -558,12 +558,18 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   }
 
   function handleWorkspaceSelect(workspaceId: string | null) {
-    // Switching workspace switches the whole view: reset the group filter and
-    // the open note so the editor doesn't keep showing a note from another view.
+    // Switching workspace switches the whole view: reset the scope (so Trash /
+    // Pinned / Shared don't silently stack with the workspace filter), the group
+    // filter, and the open note so the editor doesn't keep showing a note from
+    // another view.
     flushCurrentDraft();
+    setScope("all");
     setSelectedWorkspace(workspaceId);
     setSelectedFolder(null);
     setFolderCleared(true);
+    setSelectedShareGroup(null);
+    setSelectedTag(null);
+    setCalendarDay(null);
     setSelectedId(null);
     setDraft(null);
     setIsDirty(false);
@@ -787,6 +793,14 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     if (command && event.key.toLowerCase() === "s") {
       event.preventDefault();
       flushCurrentDraft();
+      return;
+    }
+
+    // Ctrl/Cmd+R: browsers reload natively; the Tauri shell doesn't, so handle
+    // it here to make refresh work in the desktop app too.
+    if (command && event.key.toLowerCase() === "r") {
+      event.preventDefault();
+      window.location.reload();
       return;
     }
 
