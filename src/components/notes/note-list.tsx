@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, Lock, Pin } from "lucide-react";
-import { plainPreview } from "@/lib/notes/format";
+import { bodyToPlainText } from "@/lib/notes/rich";
 import { displayTitle } from "@/lib/notes/model";
 import { tagColor } from "@/lib/notes/tags";
 import type { Note, NoteScope } from "@/lib/notes/types";
@@ -107,7 +107,7 @@ export function NoteList({
                   <span>{displayTitle(note)}</span>
                 </span>
                 <span className="note-row-preview">
-                  {note.lockHash ? "Locked note" : plainPreview(note.body) || "No additional text"}
+                  {note.lockHash ? "Locked note" : bodyToPlainText(note.body).slice(0, 160) || "No additional text"}
                 </span>
                 <span className="note-row-meta">
                   <span>{formatUpdatedAt(note.updatedAt)}</span>
@@ -145,5 +145,6 @@ export function NoteList({
     </section>
   );
 }
+
 
 

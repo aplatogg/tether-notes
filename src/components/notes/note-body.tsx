@@ -6,6 +6,7 @@ import {
   parseInline,
   type NoteBlock,
 } from "@/lib/notes/format";
+import { isHtmlBody, sanitizeHtml } from "@/lib/notes/rich";
 
 export function InlineText({ text }: { text: string }): ReactNode {
   return parseInline(text).map((token, index) => {
@@ -22,6 +23,15 @@ interface NoteBodyProps {
 }
 
 export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
+  if (isHtmlBody(body)) {
+    return (
+      <div
+        className="note-preview rich-content"
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(body) }}
+      />
+    );
+  }
+
   const blocks = parseBlocks(body);
   const nodes: ReactNode[] = [];
   let listType: "bullet" | "checklist" | "ordered" | null = null;
@@ -122,4 +132,6 @@ export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
   flush();
   return <div className="note-preview">{nodes}</div>;
 }
+
+
 

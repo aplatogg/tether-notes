@@ -1,41 +1,21 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   Archive,
   ArchiveRestore,
-  Bold,
   ChevronLeft,
-  Code,
-  Eye,
-  FileCode2,
   FileText,
-  Italic,
   Link2,
-  List,
-  ListChecks,
-  ListOrdered,
   LoaderCircle,
   Lock,
   LockOpen,
-  Pencil,
   Pin,
   PinOff,
   Save,
   Trash2,
-  Type,
 } from "lucide-react";
-import { NoteBody } from "@/components/notes/note-body";
-import {
-  applyBlockStyle,
-  applyCodeBlock,
-  applyInlineStyle,
-  checklistProgress,
-  continueList,
-  indentOf,
-  indentSelection,
-  toggleChecklistLine,
-} from "@/lib/notes/format";
+import { RichEditor } from "@/components/notes/rich-editor";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
 import { normalizeTags } from "@/lib/notes/model";
 import type { Note } from "@/lib/notes/types";
@@ -78,8 +58,6 @@ export function NoteEditor({
   onCreate,
   hiddenOnMobile,
 }: NoteEditorProps) {
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const [mode, setMode] = useState<"write" | "preview">("write");
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
   const [pinMode, setPinMode] = useState<"set" | "unlock" | "remove" | null>(null);
   const [pin, setPin] = useState("");
@@ -89,107 +67,12 @@ export function NoteEditor({
   const [shareError, setShareError] = useState<string | null>(null);
 
   const locked = Boolean(note?.lockHash) && !(note ? unlocked[note.id] : false);
-  const progress = note ? checklistProgress(note.body) : { done: 0, total: 0 };
 
   function commitTags() {
     if (!note) return;
     onChange({ tags: normalizeTags(note.tags) });
   }
 
-  function applyEdit(
-    transform: (body: string, start: number, end: number) => { body: string; selectionStart: number; selectionEnd: number },
-  ) {
-    if (!note) return;
-    const textarea = bodyRef.current;
-    // The textarea is uncontrolled, so the DOM is the source of truth while typing.
-    const current = textarea ? textarea.value : note.body;
-    const start = textarea?.selectionStart ?? current.length;
-    const end = textarea?.selectionEnd ?? current.length;
-    const result = transform(current, start, end);
-
-    onChange({ body: result.body });
-
-    if (textarea) {
-      textarea.focus();
-      applyResult(textarea, result);
-    }
-  }
-
-  function formatBlock(type: Parameters<typeof applyBlockStyle>[3]) {
-    applyEdit((body, start, end) => applyBlockStyle(body, start, end, type));
-  }
-
-  /**
-   * Applies a programmatic edit through execCommand so the browser keeps a real
-   * undo stack; direct `textarea.value = ...` would wipe Ctrl+Z history.
-   */
-  function applyResult(
-    textarea: HTMLTextAreaElement,
-    result: { body: string; selectionStart: number; selectionEnd: number },
-  ) {
-    const previous = textarea.value;
-
-    if (previous !== result.body && typeof document.execCommand === "function") {
-      let start = 0;
-      while (start < previous.length && start < result.body.length && previous[start] === result.body[start]) {
-        start += 1;
-      }
-
-      let tail = 0;
-      while (
-        tail < previous.length - start &&
-        tail < result.body.length - start &&
-        previous[previous.length - 1 - tail] === result.body[result.body.length - 1 - tail]
-      ) {
-        tail += 1;
-      }
-
-      const end = previous.length - tail;
-      const inserted = result.body.slice(start, result.body.length - tail);
-      const applied = document.execCommand("insertText", false, inserted);
-
-      if (!applied) {
-        textarea.setRangeText(inserted, start, end, "end");
-      }
-    }
-
-    textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
-    onChange({ body: textarea.value });
-  }
-
-  function handleBodyKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    const textarea = event.currentTarget;
-
-    if (event.key === "Tab") {
-      event.preventDefault();
-      const result = indentSelection(
-        textarea.value,
-        textarea.selectionStart,
-        textarea.selectionEnd,
-        event.shiftKey ? -1 : 1,
-      );
-      applyResult(textarea, result);
-      return;
-    }
-
-    if (event.key === "Enter" && !event.shiftKey) {
-      const result = continueList(textarea.value, textarea.selectionStart);
-      if (!result) return;
-      event.preventDefault();
-      applyResult(textarea, result);
-      return;
-    }
-
-    if (event.key === "Backspace" && textarea.selectionStart === textarea.selectionEnd) {
-      const caret = textarea.selectionStart;
-      const lineStart = textarea.value.lastIndexOf("\n", Math.max(0, caret - 1)) + 1;
-      const prefix = textarea.value.slice(lineStart, caret);
-      if (/^ +$/.test(prefix) && indentOf(prefix) > 0) {
-        event.preventDefault();
-        applyResult(textarea, indentSelection(textarea.value, caret, caret, -1));
-      }
-    }
-  }
   async function openPinModal(next: "set" | "unlock" | "remove") {
     setPin("");
     setPinError(null);
@@ -278,17 +161,6 @@ export function NoteEditor({
               {noteStateLabel(note, isDirty, isLocalOnly)}
             </span>
             <div className="editor-actions">
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => setMode(mode === "write" ? "preview" : "write")}
-                aria-label={mode === "write" ? "Preview formatting" : "Edit note"}
-                aria-pressed={mode === "preview"}
-                title={mode === "write" ? "Preview" : "Edit"}
-                disabled={locked}
-              >
-                {mode === "write" ? <Eye aria-hidden="true" /> : <Pencil aria-hidden="true" />}
-              </button>
               <button
                 className="icon-button"
                 type="button"
@@ -395,81 +267,12 @@ export function NoteEditor({
                   autoComplete="off"
                   maxLength={500}
                 />
-
-                <div className="editor-format-bar" role="toolbar" aria-label="Text formatting">
-                  {[
-                    { type: "heading" as const, label: "Heading", Icon: Type, text: "H" },
-                    { type: "subheading" as const, label: "Subheading", Icon: Type, text: "H2" },
-                  ].map(({ type, label, Icon, text }) => (
-                    <button key={label} className="format-button" type="button" onClick={() => formatBlock(type)} aria-label={label} title={label} disabled={mode === "preview"}>
-                      <Icon aria-hidden="true" className="sr-only" />
-                      {text}
-                    </button>
-                  ))}
-                  {[
-                    { type: "bullet" as const, label: "Bulleted list", Icon: List },
-                    { type: "ordered" as const, label: "Numbered list", Icon: ListOrdered },
-                    { type: "checklist" as const, label: "Checklist", Icon: ListChecks },
-                  ].map(({ type, label, Icon }) => (
-                    <button key={label} className="format-button" type="button" onClick={() => formatBlock(type)} aria-label={label} title={label} disabled={mode === "preview"}>
-                      <Icon aria-hidden="true" />
-                    </button>
-                  ))}
-                  <span className="format-divider" aria-hidden="true" />
-                  {[
-                    { marker: "**" as const, label: "Bold", Icon: Bold },
-                    { marker: "*" as const, label: "Italic", Icon: Italic },
-                  ].map(({ marker, label, Icon }) => (
-                    <button key={label} className="format-button" type="button" onClick={() => applyEdit((body, start, end) => applyInlineStyle(body, start, end, marker))} aria-label={label} title={label} disabled={mode === "preview"}>
-                      <Icon aria-hidden="true" />
-                    </button>
-                  ))}
-                  <button
-                    className="format-button"
-                    type="button"
-                    onClick={() => applyEdit((body, start, end) => applyInlineStyle(body, start, end, "`"))}
-                    aria-label="Inline code"
-                    title="Inline code"
-                    disabled={mode === "preview"}
-                  >
-                    <Code aria-hidden="true" />
-                  </button>
-                  <button
-                    className="format-button"
-                    type="button"
-                    onClick={() => applyEdit((body, start, end) => applyCodeBlock(body, start, end))}
-                    aria-label="Code block"
-                    title="Code block"
-                    disabled={mode === "preview"}
-                  >
-                    <FileCode2 aria-hidden="true" />
-                  </button>
-                  {progress.total > 0 ? (
-                    <span className="format-hint num">{progress.done}/{progress.total} done</span>
-                  ) : (
-                    <span className="format-hint">Select lines, then format.</span>
-                  )}
-                </div>
-
-                {mode === "write" ? (
-                  <>
-                    <label className="sr-only" htmlFor="note-body">Note body</label>
-                    <textarea
-                      key={`body-${note.id}`}
-                      id="note-body"
-                      ref={bodyRef}
-                      className="body-input"
-                      defaultValue={note.body}
-                      onChange={(event) => onChange({ body: event.target.value })}
-                      onKeyDown={handleBodyKeyDown}
-                      placeholder="Start writing. H heading, H2 subheading, lists, checklists, **bold**, `code`, and ``` code blocks."
-                    />
-                  </>
-                ) : (
-                  <div className="note-preview-scroll">
-                    <NoteBody body={note.body} onToggleChecklist={(lineIndex) => onChange({ body: toggleChecklistLine(note.body, lineIndex) })} />
-                  </div>
-                )}
+                <RichEditor
+                  noteId={note.id}
+                  value={note.body}
+                  onChange={(html) => onChange({ body: html })}
+                  onSaveShortcut={onSave}
+                />
               </div>
 
               <footer className="editor-footer">
@@ -541,9 +344,3 @@ export function NoteEditor({
     </section>
   );
 }
-
-
-
-
-
-

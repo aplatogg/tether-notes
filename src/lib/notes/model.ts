@@ -1,4 +1,5 @@
 import { stripBlockPrefix } from "./format";
+import { bodyToPlainText, isHtmlBody } from "./rich";
 import type { CreateDraftNoteInput, Note, NoteFilter } from "./types";
 
 const MAX_DISPLAY_TITLE_LENGTH = 80;
@@ -155,7 +156,9 @@ export function displayTitle(note: Note): string {
     return truncateGraphemes(explicitTitle, MAX_DISPLAY_TITLE_LENGTH);
   }
 
-  for (const line of note.body.split(/\r\n?|[\n\u2028\u2029]/u)) {
+  const bodyText = isHtmlBody(note.body) ? bodyToPlainText(note.body) : note.body;
+
+  for (const line of bodyText.split(/\r\n?|[\n\u2028\u2029]/u)) {
     const trimmedLine = line.trim();
 
     if (trimmedLine) {
@@ -203,7 +206,7 @@ export function matchesSearch(note: Note, query: string): boolean {
   const normalizedTags = note.tags.map(normalizeTag).filter(Boolean);
   const searchableFields = [
     normalizeSearchText(note.title),
-    ...(note.lockHash ? [] : [normalizeSearchText(note.body)]),
+    ...(note.lockHash ? [] : [normalizeSearchText(isHtmlBody(note.body) ? bodyToPlainText(note.body) : note.body)]),
     ...normalizedTags,
     ...normalizedTags.map((tag) => `#${tag}`),
   ];
@@ -274,5 +277,6 @@ export function sortNotes(notes: readonly Note[]): Note[] {
     })
     .map(({ note }) => note);
 }
+
 
 
