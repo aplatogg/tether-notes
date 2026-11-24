@@ -536,6 +536,48 @@ describe("NotesRepository", () => {
     expect(await repository.get(newer.id)).toEqual(newer);
   });
 
+  test("re-applies equal-timestamp remote state so share metadata refreshes", async () => {
+    const shared = makeNote({
+      id: "shared-1",
+      userId: "owner-9",
+      shared: true,
+      sharedFor: "user-1",
+      updatedAt: "2026-11-24T13:00:00.000Z",
+      syncStatus: "synced",
+    });
+    await repository.applyRemoteUpsert(shared);
+
+    const enriched = makeNote({
+      ...shared,
+      ownerEmail: "owner@example.com",
+      shareGroup: "Kerja",
+    });
+
+    expect(await repository.mergeRemote(enriched)).toBe("applied");
+    const stored = await repository.get(shared.id);
+    expect(stored?.ownerEmail).toBe("owner@example.com");
+    expect(stored?.shareGroup).toBe("Kerja");
+  });
+
+  test("setLocalShareGroup updates only the group label without an outbox mutation", async () => {
+    const shared = makeNote({
+      id: "shared-2",
+      userId: "owner-9",
+      shared: true,
+      sharedFor: "user-1",
+      syncStatus: "synced",
+    });
+    await repository.applyRemoteUpsert(shared);
+
+    const updated = await repository.setLocalShareGroup("shared-2", "Kerja");
+    expect(updated.shareGroup).toBe("Kerja");
+    expect((await repository.get("shared-2"))?.shareGroup).toBe("Kerja");
+    expect(await repository.listOutbox("user-1")).toHaveLength(0);
+
+    const cleared = await repository.setLocalShareGroup("shared-2", "  ");
+    expect(cleared.shareGroup).toBeNull();
+  });
+
   test("stores and reads metadata without mixing it into note records", async () => {
     await repository.setMetadata("last-pull:user-1", NOW);
 

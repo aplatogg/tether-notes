@@ -272,7 +272,10 @@ export class NotesRepository {
         if (stored) {
           const local = parseNote(fromStoredNote(stored));
 
-          if (Date.parse(remote.updatedAt) <= Date.parse(local.updatedAt)) {
+          // Strictly older remote state is ignored. Equal timestamps are still
+          // applied so recipient-side share metadata (ownerEmail, shareGroup)
+          // refreshes even when the note content did not change.
+          if (Date.parse(remote.updatedAt) < Date.parse(local.updatedAt)) {
             return "ignored-older";
           }
         }
