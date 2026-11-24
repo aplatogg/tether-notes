@@ -1,3 +1,14 @@
+<p align="center">
+  <a href="https://tethernotes.me"><img alt="Live" src="https://img.shields.io/badge/live-tethernotes.me-0F766E"></a>
+  <a href="https://github.com/aplatogg/tether-notes/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/aplatogg/tether-notes?color=0F766E"></a>
+  <a href="https://github.com/aplatogg/tether-notes/actions/workflows/keepalive.yml"><img alt="Keepalive" src="https://img.shields.io/github/actions/workflow/status/aplatogg/tether-notes/keepalive.yml?label=supabase%20keepalive"></a>
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+  <img alt="Tauri" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/aplatogg/tether-notes?color=0F766E"></a>
+</p>
+
 # Tether Notes
 
 Tether Notes is an installable local-first notes app. Notes are written to IndexedDB immediately, remain available offline, and can sync across authenticated devices through Supabase.
@@ -120,4 +131,5 @@ Press **Ctrl+Alt+N** anywhere on Windows to toggle a floating mini-window:
 - recent notes are one click away to continue writing
 
 The desktop shell keeps its own session, so sign in once inside the app to sync captures to the same Supabase project as the web/PWA build.
+
 
