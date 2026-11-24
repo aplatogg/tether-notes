@@ -235,7 +235,9 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
           folder: effectiveFolder ?? undefined,
           day: calendarDay ?? undefined,
           shareGroup: scope === "shared" ? (selectedShareGroup ?? undefined) : undefined,
-          workspace: selectedWorkspace,
+          // null would mean "personal only" in filterNotes; no selection must be
+          // undefined so "All notes" includes workspace notes too.
+          workspace: selectedWorkspace ?? undefined,
         }),
       ),
     [
