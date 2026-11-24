@@ -170,6 +170,17 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     return notes.map((note) => (activeDraft?.id === note.id ? activeDraft : note));
   }, [activeDraft, workspace.notes]);
 
+  const folders = useMemo(
+    () => mergeFolders(collectFolders(notesWithDraft), workspace.customFolders ?? []),
+    [notesWithDraft, workspace.customFolders],
+  );
+
+  // Default view: the user's own "General" group, unless the user cleared the filter.
+  const [folderCleared, setFolderCleared] = useState(false);
+  const effectiveFolder =
+    selectedFolder ??
+    (folderCleared || scope !== "all" || !folders.includes(DEFAULT_GROUP) ? null : DEFAULT_GROUP);
+
   const filteredNotes = useMemo(
     () =>
       sortNotes(
@@ -184,17 +195,6 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
       ),
     [notesWithDraft, query, scope, selectedTag, effectiveFolder, calendarDay, selectedShareGroup],
   );
-
-  const folders = useMemo(
-    () => mergeFolders(collectFolders(notesWithDraft), workspace.customFolders ?? []),
-    [notesWithDraft, workspace.customFolders],
-  );
-
-  // Default view: the user's own "General" group, unless the user cleared the filter.
-  const [folderCleared, setFolderCleared] = useState(false);
-  const effectiveFolder =
-    selectedFolder ??
-    (folderCleared || scope !== "all" || !folders.includes(DEFAULT_GROUP) ? null : DEFAULT_GROUP);
 
   const shareGroups = useMemo(() => collectShareGroups(notesWithDraft), [notesWithDraft]);
 
