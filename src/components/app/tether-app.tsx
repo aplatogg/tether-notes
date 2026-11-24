@@ -66,6 +66,8 @@ import { tagColor } from "@/lib/notes/tags";
 import type { Note, NoteScope } from "@/lib/notes/types";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getNotesDatabase } from "@/lib/db/database";
+import { NotesRepository } from "@/lib/db/repository";
 import { setSharedNoteGroup, setShareAutogroup } from "@/lib/supabase/sharing";
 import {
   acceptWorkspaceInvite,
@@ -1523,6 +1525,16 @@ function CloudWorkspace({
       onSignOut={async () => {
         const { error } = await client.auth.signOut();
         if (error) throw error;
+        // Privacy on shared machines: wipe this account's local cache, but only
+        // when nothing is pending sync (otherwise the next sign-in resumes it).
+        const database = getNotesDatabase();
+        if (database) {
+          const repository = new NotesRepository(database);
+          const pending = await repository.listOutbox(session.user.id);
+          if (pending.length === 0) {
+            await repository.clearUserData(session.user.id);
+          }
+        }
       }}
     />
   );
