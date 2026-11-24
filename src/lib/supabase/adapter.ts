@@ -15,6 +15,8 @@ const remoteNoteSchema = z
     is_pinned: z.boolean(),
     is_archived: z.boolean(),
     lock_hash: z.string().nullable().optional(),
+    reminder_at: timestampSchema.nullable().optional(),
+    folder: z.string().optional(),
     deleted_at: timestampSchema.nullable(),
     created_at: timestampSchema,
     updated_at: timestampSchema,
@@ -43,6 +45,8 @@ export function noteToRemoteRow(note: Note): RemoteNoteRow {
     is_pinned: note.isPinned,
     is_archived: note.isArchived,
     lock_hash: note.lockHash ?? null,
+    reminder_at: note.reminderAt ?? null,
+    folder: note.folder ?? "",
     deleted_at: note.deletedAt,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
@@ -62,6 +66,8 @@ export function remoteRowToNote(value: unknown, currentUserId?: string): Note {
     isPinned: row.is_pinned,
     isArchived: row.is_archived,
     lockHash: row.lock_hash ?? null,
+    reminderAt: row.reminder_at ?? null,
+    folder: row.folder ?? "",
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -87,7 +93,7 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
       const { data, error } = await client
         .from("notes")
         .select(
-          "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,deleted_at,created_at,updated_at",
+          "id,user_id,title,body,tags,is_pinned,is_archived,lock_hash,reminder_at,folder,deleted_at,created_at,updated_at",
         )
         .order("updated_at", { ascending: true });
 

@@ -21,6 +21,10 @@ export interface Note {
   sharedFor?: string | null;
   /** Owner's email, shown on notes shared with us. */
   ownerEmail?: string | null;
+  /** Optional reminder timestamp (ISO); fires a local notification when due. */
+  reminderAt?: string | null;
+  /** Optional folder name for grouping beyond tags. */
+  folder?: string;
 }
 
 export interface CreateDraftNoteInput {
@@ -39,6 +43,9 @@ export interface NoteFilter {
   scope: NoteScope;
   query?: string;
   tag?: string;
+  folder?: string;
+  /** Calendar day filter, YYYY-MM-DD (matches createdAt or reminderAt day). */
+  day?: string;
 }
 
 

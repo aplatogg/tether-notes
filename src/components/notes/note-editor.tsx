@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { RichEditor } from "@/components/notes/rich-editor";
+import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl } from "@/components/notes/note-extras";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
 import { normalizeTags } from "@/lib/notes/model";
 import { trashDaysLeft } from "@/lib/notes/trash";
@@ -36,6 +37,7 @@ interface NoteEditorProps {
   note: Note | null;
   isDirty: boolean;
   isLocalOnly: boolean;
+  folders: string[];
   onChange: (changes: Partial<Note>) => void;
   onSave: () => void;
   onTogglePin: () => void;
@@ -61,6 +63,7 @@ export function NoteEditor({
   note,
   isDirty,
   isLocalOnly,
+  folders,
   onChange,
   onSave,
   onTogglePin,
@@ -246,6 +249,7 @@ export function NoteEditor({
             <div className="editor-actions">
               {readOnly ? null : (
                 <>
+                  <ReminderControl note={note} readOnly={readOnly} onChange={onChange} />
                   <button
                     className="icon-button"
                     type="button"
@@ -384,6 +388,7 @@ export function NoteEditor({
                   autoComplete="off"
                   maxLength={500}
                 />
+                <FolderInput note={note} folders={folders} readOnly={readOnly || note.deletedAt !== null} onChange={onChange} />
                 <RichEditor
                   key={note.id}
                   readOnly={note.deletedAt !== null || readOnly}
@@ -391,6 +396,10 @@ export function NoteEditor({
                   onChange={(html) => onChange({ body: html })}
                   onSaveShortcut={onSave}
                 />
+                <div className="editor-extras">
+                  <AttachmentsPanel note={note} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
+                  <AiSummaryPanel note={note} readOnly={readOnly} />
+                </div>
               </div>
 
               <footer className="editor-footer">

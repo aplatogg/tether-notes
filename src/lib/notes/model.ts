@@ -214,9 +214,41 @@ export function matchesSearch(note: Note, query: string): boolean {
   return terms.every((term) => searchableFields.some((field) => field.includes(term)));
 }
 
+const DAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/u;
+
+/** Local calendar day (YYYY-MM-DD) of a timestamp, UTC-based for stability. */
+export function dayOfTimestamp(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+export function noteDays(note: Note): string[] {
+  const days = new Set<string>();
+  const created = dayOfTimestamp(note.createdAt);
+  if (created) days.add(created);
+  if (note.reminderAt) {
+    const reminded = dayOfTimestamp(note.reminderAt);
+    if (reminded) days.add(reminded);
+  }
+  return [...days];
+}
+
+/** Distinct, sorted folder names across the given notes. */
+export function collectFolders(notes: readonly Note[]): string[] {
+  const folders = new Set<string>();
+  notes.forEach((note) => {
+    const folder = (note.folder ?? "").trim();
+    if (folder) folders.add(folder);
+  });
+  return [...folders].sort((left, right) => left.localeCompare(right));
+}
+
 export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] {
   const selectedTag = filter.tag === undefined ? "" : normalizeTag(filter.tag);
   const query = normalizeSearchText(filter.query ?? "").trim();
+  const selectedFolder = (filter.folder ?? "").trim();
+  const selectedDay = filter.day !== undefined && DAY_PATTERN.test(filter.day) ? filter.day : "";
 
   return notes.filter((note) => {
     if (filter.scope === "trash") {
@@ -231,8 +263,10 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
     }
 
     if (filter.scope === "shared") {
-      if (!note.shared || note.deletedAt !== null) return false;
+      if (!note.shared) return false;
       if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) return false;
+      if (selectedFolder && (note.folder ?? "").trim() !== selectedFolder) return false;
+      if (selectedDay && !noteDays(note).includes(selectedDay)) return false;
       if (query.length === 0) return true;
       return matchesSearch(note, query);
     }
@@ -254,6 +288,14 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
     }
 
     if (selectedTag && !note.tags.some((tag) => normalizeTag(tag) === selectedTag)) {
+      return false;
+    }
+
+    if (selectedFolder && (note.folder ?? "").trim() !== selectedFolder) {
+      return false;
+    }
+
+    if (selectedDay && !noteDays(note).includes(selectedDay)) {
       return false;
     }
 

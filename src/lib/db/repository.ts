@@ -30,6 +30,8 @@ export const noteSchema = z
     shared: z.boolean().optional(),
     sharedFor: z.string().nullable().optional(),
     ownerEmail: z.string().nullable().optional(),
+    reminderAt: timestampSchema.nullable().optional(),
+    folder: z.string().optional(),
   })
   .strict();
 

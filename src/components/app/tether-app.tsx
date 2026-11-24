@@ -11,10 +11,13 @@ import {
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   Archive,
+  Bell,
   Check,
   CircleAlert,
   Database,
+  Download,
   FileText,
+  Folder,
   LoaderCircle,
   LogOut,
   Pin,
@@ -22,6 +25,7 @@ import {
   Search,
   Tags,
   Trash2,
+  Upload,
   UserRound,
   UsersRound,
   WifiOff,
@@ -29,8 +33,25 @@ import {
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
+import {
+  collectFolders,
+  filterNotes,
+  normalizeTags,
+  sortNotes,
+} from "@/lib/notes/model";
+import {
+  downloadText,
+  exportNotesJson,
+  parseImportJson,
+} from "@/lib/notes/export";
+import {
+  dueReminders,
+  ensureNotificationPermission,
+  loadFiredReminders,
+  notifyDue,
+  saveFiredReminders,
+} from "@/lib/notes/reminder";
 import { useNotesWorkspace } from "@/hooks/use-notes-workspace";
-import { filterNotes, normalizeTags, sortNotes } from "@/lib/notes/model";
 import { tagColor } from "@/lib/notes/tags";
 import type { Note, NoteScope } from "@/lib/notes/types";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
@@ -111,6 +132,11 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
   const [scope, setScope] = useState<NoteScope>("all");
   const [query, setQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarDay, setCalendarDay] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Note | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -137,10 +163,24 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
           scope,
           query,
           tag: selectedTag ?? undefined,
+          folder: selectedFolder ?? undefined,
+          day: calendarDay ?? undefined,
         }),
       ),
-    [notesWithDraft, query, scope, selectedTag],
+    [notesWithDraft, query, scope, selectedTag, selectedFolder, calendarDay],
   );
+
+  const folders = useMemo(() => collectFolders(notesWithDraft), [notesWithDraft]);
+
+  const folderCounts = useMemo(() => {
+    const totals = new Map<string, number>();
+    notesWithDraft.forEach((note) => {
+      if (note.deletedAt !== null) return;
+      const folder = (note.folder ?? "").trim();
+      if (folder) totals.set(folder, (totals.get(folder) ?? 0) + 1);
+    });
+    return totals;
+  }, [notesWithDraft]);
 
   const counts = useMemo(
     () => ({
@@ -324,6 +364,55 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
     setMobilePane("list");
   }
 
+  function handleFolderSelect(folder: string) {
+    setSelectedFolder(folder || null);
+    setMobilePane("list");
+  }
+
+  function handleExport() {
+    const own = (notesWithDraft ?? []).filter((note) => !note.shared);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadText(`tether-notes-${stamp}.json`, exportNotesJson(own));
+  }
+
+  async function handleImportFile(file: File | undefined) {
+    if (!file) return;
+    setImportError(null);
+    try {
+      const text = await file.text();
+      const imported = parseImportJson(text);
+      let count = 0;
+      for (const note of imported) {
+        await workspace.saveNote({ ...note, userId, shared: false, sharedFor: null, ownerEmail: null });
+        count += 1;
+      }
+      void workspace.retrySync();
+      window.alert(`Imported ${count} note${count === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  }
+
+  // Fire local notifications for due reminders.
+  useEffect(() => {
+    if (!workspace.notes) return;
+    const check = () => {
+      const fired = loadFiredReminders();
+      const due = dueReminders(workspace.notes ?? [], new Date(), fired);
+      if (due.length === 0) return;
+      due.forEach((note) => {
+        fired.add(note.id);
+        void notifyDue(note);
+      });
+      saveFiredReminders(fired);
+    };
+    check();
+    const timer = window.setInterval(check, 30_000);
+    return () => window.clearInterval(timer);
+  }, [workspace.notes]);
+
   const handleShortcut = useEffectEvent((event: KeyboardEvent) => {
     const command = event.metaKey || event.ctrlKey;
 
@@ -420,6 +509,24 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
           )}
         </div>
 
+        {folders.length > 0 ? (
+          <div className="sidebar-tags">
+            <p><Folder aria-hidden="true" /> Folders</p>
+            {folders.slice(0, 10).map((folder) => (
+              <button
+                className={selectedFolder === folder ? "is-active" : undefined}
+                type="button"
+                key={folder}
+                onClick={() => handleFolderSelect(folder)}
+              >
+                <span>{folder}</span>
+                <span className="num">{folderCounts.get(folder) ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+
         <div className="sidebar-foot">
           <span>{userId ? "Synced workspace" : "On this device"}</span>
           <strong>{email ?? "Local workspace"}</strong>
@@ -456,6 +563,31 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
               <div className="account-menu">
                 <span>{userId ? "Signed in" : "Local-only mode"}</span>
                 <strong>{email ?? "No account required"}</strong>
+                {userId ? (
+                  <>
+                    <button type="button" onClick={handleExport}>
+                      <Download aria-hidden="true" /> Export all notes (.json)
+                    </button>
+                    <button type="button" onClick={() => importInputRef.current?.click()}>
+                      <Upload aria-hidden="true" /> Import notes (.json)
+                    </button>
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="sr-only"
+                      aria-label="Import notes file"
+                      onChange={(event) => void handleImportFile(event.target.files?.[0])}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void ensureNotificationPermission()}
+                    >
+                      <Bell aria-hidden="true" /> Enable reminder notifications
+                    </button>
+                  </>
+                ) : null}
+                {importError ? <p className="form-error" role="alert">{importError}</p> : null}
                 {onSignOut ? (
                   <button type="button" onClick={() => void handleSignOut()} disabled={isSigningOut}>
                     <LogOut aria-hidden="true" />
@@ -486,23 +618,31 @@ function NotesWorkspace({ userId, email, adapter, onSignOut, bootWarning }: Work
           </div>
         ) : null}
         <div className="workspace-panes">
-          <NoteList
-            notes={filteredNotes}
-            selectedId={selectedId}
-            isLoading={workspace.isLoading}
-            query={query}
-            scope={scope}
-            selectedTag={selectedTag}
-            onSelect={handleSelect}
-            onTagSelect={handleTagSelect}
-            onCreate={() => void handleCreate()}
-            hiddenOnMobile={mobilePane === "editor"}
-          />
-          <NoteEditor
-            note={activeDraft}
-            isDirty={isDirty}
-            isLocalOnly={workspace.syncState.phase === "local-only"}
-            onChange={handleDraftChange}
+            <NoteList
+              notes={filteredNotes}
+              selectedId={selectedId}
+              isLoading={workspace.isLoading}
+              query={query}
+              scope={scope}
+              selectedTag={selectedTag}
+              selectedFolder={selectedFolder}
+              showCalendar={showCalendar}
+              calendarDay={calendarDay}
+              calendarNotes={notesWithDraft}
+              onSelect={handleSelect}
+              onTagSelect={handleTagSelect}
+              onFolderSelect={handleFolderSelect}
+              onToggleCalendar={() => setShowCalendar((value) => !value)}
+              onSelectDay={setCalendarDay}
+              onCreate={() => void handleCreate()}
+              hiddenOnMobile={mobilePane === "editor"}
+            />
+            <NoteEditor
+              note={activeDraft}
+              isDirty={isDirty}
+              isLocalOnly={workspace.syncState.phase === "local-only"}
+              folders={folders}
+              onChange={handleDraftChange}
             onSave={flushCurrentDraft}
             onTogglePin={handleTogglePin}
             onToggleArchive={handleToggleArchive}

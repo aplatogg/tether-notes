@@ -28,6 +28,8 @@ describe("Supabase note mapping", () => {
       is_pinned: true,
       is_archived: false,
       lock_hash: null,
+      reminder_at: null,
+      folder: "",
       deleted_at: null,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
@@ -38,6 +40,8 @@ describe("Supabase note mapping", () => {
     expect(remoteRowToNote(noteToRemoteRow(note))).toEqual({
       ...note,
       lockHash: null,
+      reminderAt: null,
+      folder: "",
       syncStatus: "synced",
       lastSyncError: undefined,
       shared: false,

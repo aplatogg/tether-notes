@@ -18,6 +18,7 @@ Tether Notes is an installable local-first notes app. Notes are written to Index
 - Create, edit, autosave, search, tag, pin, archive, restore, and soft-delete notes.
 - Share a note with another account by email (read-only for them, listed under "Shared with me") or via a public read-only link.
 - PIN-locked notes (hash stored with the note) and a 30-day trash with restore/delete-forever.
+- Reminders per note with local notifications, folders, a calendar day-filter, attachments (files + voice notes via Supabase Storage), JSON export/import, and a BYOK AI summary (your own API key, stored only in this browser).
 - IndexedDB is the UI source of truth; local writes never wait for the network.
 - Durable, coalesced outbox with bounded retries and operation-ID protection for edits made while a request is in flight.
 - Email/password Supabase Auth, strict row-level security, pull/push sync, and Realtime updates.

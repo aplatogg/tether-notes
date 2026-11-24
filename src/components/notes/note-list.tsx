@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, Lock, Pin, UsersRound } from "lucide-react";
+import { Bell, CalendarDays, FileText, Folder, Lock, Pin, UsersRound } from "lucide-react";
+import { CalendarView } from "@/components/notes/calendar-view";
 import { bodyToPlainText } from "@/lib/notes/rich";
 import { displayTitle } from "@/lib/notes/model";
 import { tagColor } from "@/lib/notes/tags";
@@ -13,8 +14,15 @@ interface NoteListProps {
   query: string;
   scope: NoteScope;
   selectedTag: string | null;
+  selectedFolder: string | null;
+  showCalendar: boolean;
+  calendarDay: string | null;
+  calendarNotes: Note[];
   onSelect: (note: Note) => void;
   onTagSelect: (tag: string) => void;
+  onFolderSelect: (folder: string) => void;
+  onToggleCalendar: () => void;
+  onSelectDay: (day: string | null) => void;
   onCreate: () => void;
   hiddenOnMobile: boolean;
 }
@@ -65,8 +73,15 @@ export function NoteList({
   query,
   scope,
   selectedTag,
+  selectedFolder,
+  showCalendar,
+  calendarDay,
+  calendarNotes,
   onSelect,
   onTagSelect,
+  onFolderSelect,
+  onToggleCalendar,
+  onSelectDay,
   onCreate,
   hiddenOnMobile,
 }: NoteListProps) {
@@ -78,18 +93,40 @@ export function NoteList({
     >
       <header className="pane-heading">
         <div>
-           <h1>{scope === "all" ? "All notes" : scope === "pinned" ? "Pinned" : scope === "archived" ? "Archived" : scope === "trash" ? "Trash" : "Shared with me"}</h1>
+          <h1>{scope === "all" ? "All notes" : scope === "pinned" ? "Pinned" : scope === "archived" ? "Archived" : scope === "trash" ? "Trash" : "Shared with me"}</h1>
           <p className="num">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>
         </div>
-        <button className="mobile-new-button" type="button" onClick={onCreate}>
-          New
-        </button>
+        <div className="pane-heading-actions">
+          <button
+            className={showCalendar ? "mobile-new-button is-active" : "mobile-new-button"}
+            type="button"
+            onClick={onToggleCalendar}
+            aria-label="Toggle calendar"
+            aria-pressed={showCalendar}
+            title="Calendar"
+          >
+            <CalendarDays aria-hidden="true" />
+          </button>
+          <button className="mobile-new-button" type="button" onClick={onCreate}>
+            New
+          </button>
+        </div>
       </header>
+
+      {showCalendar ? (
+        <CalendarView notes={calendarNotes} selectedDay={calendarDay} onSelectDay={onSelectDay} />
+      ) : null}
 
       {selectedTag ? (
         <div className="active-filter">
           <span>Tag: {selectedTag}</span>
           <button type="button" onClick={() => onTagSelect("")}>Clear</button>
+        </div>
+      ) : null}
+      {selectedFolder ? (
+        <div className="active-filter">
+          <span>Folder: {selectedFolder}</span>
+          <button type="button" onClick={() => onFolderSelect("")}>Clear</button>
         </div>
       ) : null}
 
@@ -112,6 +149,7 @@ export function NoteList({
                 <span className="note-row-title">
                    {note.isPinned ? <Pin aria-label="Pinned" /> : null}
                    {note.lockHash ? <Lock aria-label="Locked" /> : null}
+                   {note.reminderAt ? <Bell aria-label={`Reminder ${new Date(note.reminderAt).toLocaleString()}`} /> : null}
                    {note.shared ? <UsersRound aria-label={`Shared by ${note.ownerEmail ?? "someone"}`} /> : null}
                   <span>{displayTitle(note)}</span>
                 </span>
@@ -119,6 +157,18 @@ export function NoteList({
                   {note.lockHash ? "Locked note" : bodyToPlainText(note.body).slice(0, 160) || "No additional text"}
                 </span>
                 <span className="note-row-meta">
+                  {note.folder?.trim() ? (
+                    <button
+                      type="button"
+                      className="folder-chip"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onFolderSelect(note.folder!.trim());
+                      }}
+                    >
+                      <Folder aria-hidden="true" /> {note.folder.trim()}
+                    </button>
+                  ) : null}
                   <span>{formatUpdatedAt(note.updatedAt)}</span>
                 </span>
               </button>
