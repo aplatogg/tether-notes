@@ -395,9 +395,10 @@ export class NotesRepository {
         throw new Error(`Note not found: ${id}`);
       }
 
+      const trimmed = group?.trim() ?? "";
       const saved = parseNote({
         ...parseNote(fromStoredNote(existing)),
-        shareGroup: group ? group.trim() : null,
+        shareGroup: trimmed === "" ? null : trimmed,
       });
 
       await this.database.notes.put(toStoredNote(saved));
