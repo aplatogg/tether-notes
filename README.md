@@ -106,7 +106,7 @@ The project sets CSP, frame, content-type, referrer, permissions, HSTS, and serv
 
 ## Deploy status
 - Vercel project `plato-ba85/tether-notes` is connected to this GitHub repository; every push to `main` creates a production deployment.
-- Live URL: https://tether-notes-three.vercel.app
+- Live URL: https://tethernotes.me (www redirects to the apex with 308)
 
 
 ## Quick capture (desktop only)
@@ -120,3 +120,4 @@ Press **Ctrl+Alt+N** anywhere on Windows to toggle a floating mini-window:
 - recent notes are one click away to continue writing
 
 The desktop shell keeps its own session, so sign in once inside the app to sync captures to the same Supabase project as the web/PWA build.
+
