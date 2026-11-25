@@ -374,16 +374,6 @@ export function NoteEditor({
               {noteStateLabel(note, isDirty, isLocalOnly)}
             </span>
             <div className="editor-actions">
-              <button
-                className={extrasOpen ? "icon-button is-active" : "icon-button"}
-                type="button"
-                onClick={() => setExtrasOpen((open) => !open)}
-                aria-label="Toggle attachments and AI summary"
-                aria-pressed={extrasOpen}
-                title="Attachments & AI summary"
-              >
-                <Paperclip aria-hidden="true" />
-              </button>
               <div className="export-control" ref={exportWrapRef}>
                 <button
                   className={exportOpen ? "icon-button is-active" : "icon-button"}

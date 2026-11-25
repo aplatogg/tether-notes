@@ -421,6 +421,7 @@ button:disabled {
 .account-button,
 .icon-button {
   display: inline-grid;
+  flex: 0 0 auto;
   place-items: center;
   width: 34px;
   height: 34px;
@@ -795,10 +796,12 @@ button:disabled {
 
 .editor-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   min-height: 52px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--rule);
+  gap: 6px;
 }
 
 .editor-save-state {
@@ -808,6 +811,7 @@ button:disabled {
 
 .editor-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   margin-left: auto;
   gap: 5px;
@@ -1490,17 +1494,18 @@ button:disabled {
   .mobile-new-button {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
-    padding: 0 13px;
+    min-height: 36px;
+    padding: 0 12px;
     border: 1px solid var(--ink);
     border-radius: var(--radius-control);
-    color: #ffffff;
+    color: var(--surface);
     background: var(--ink);
+    font-size: 13px;
     font-weight: 600;
   }
 
   .note-list {
-    padding: 0 8px 18px;
+    padding: 0 8px max(18px, env(safe-area-inset-bottom));
   }
 
   .note-row-main {
@@ -1518,18 +1523,34 @@ button:disabled {
   }
 
   .editor-toolbar {
-    min-height: 52px;
-    padding: 7px 8px;
+    min-height: 46px;
+    padding: 6px 8px;
+    gap: 4px;
   }
 
   .mobile-back {
     display: inline-grid;
+    margin-right: 2px;
+  }
+
+  .focus-toggle {
+    display: none;
   }
 
   .icon-button,
   .account-button {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .editor-toolbar .icon-button {
+    width: 31px;
+    height: 31px;
+  }
+
+  .editor-toolbar .icon-button svg {
+    width: 15px;
+    height: 15px;
   }
 
   .editor-actions {
@@ -1537,10 +1558,26 @@ button:disabled {
   }
 
   .editor-save-state {
-    overflow: hidden;
-    max-width: 118px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
+  }
+
+  .export-menu,
+  .reminder-popover {
+    position: fixed;
+    top: 98px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .rich-toolbar .format-divider {
+    display: none;
+  }
+
+  .rich-toolbar .format-button {
+    min-width: 29px;
+    height: 29px;
+    padding: 0 5px;
   }
 
   .archive-notice {
@@ -1548,7 +1585,7 @@ button:disabled {
   }
 
   .editor-fields {
-    padding: 22px 18px 8px;
+    padding: 16px 14px max(8px, env(safe-area-inset-bottom));
   }
 
   .title-input {
