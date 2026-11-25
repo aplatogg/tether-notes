@@ -687,6 +687,9 @@ export function RichEditor({
       const match = detectSlashMatch(instance);
       setSlashMatch(match);
     },
+    onBlur: () => {
+      setSlashMatch(null);
+    },
   });
 
   const filteredSlashCommands = useMemo(() => {
@@ -717,14 +720,16 @@ export function RichEditor({
         return;
       }
 
-      if (slashMatch && filteredSlashCommands.length > 0) {
+      if (slashMatch && filteredSlashCommands.length > 0 && editor.isFocused) {
         if (event.key === "ArrowDown") {
           event.preventDefault();
+          event.stopPropagation();
           setSlashIndex((current) => (current + 1) % filteredSlashCommands.length);
           return;
         }
         if (event.key === "ArrowUp") {
           event.preventDefault();
+          event.stopPropagation();
           setSlashIndex((current) =>
             (current - 1 + filteredSlashCommands.length) % filteredSlashCommands.length,
           );
@@ -732,12 +737,14 @@ export function RichEditor({
         }
         if (event.key === "Enter" || event.key === "Tab") {
           event.preventDefault();
+          event.stopPropagation();
           const picked = filteredSlashCommands[slashIndex] ?? filteredSlashCommands[0];
           if (picked) executeSlashCommand(picked);
           return;
         }
         if (event.key === "Escape") {
           event.preventDefault();
+          event.stopPropagation();
           setSlashMatch(null);
         }
       }

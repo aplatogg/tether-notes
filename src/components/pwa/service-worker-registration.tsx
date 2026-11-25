@@ -4,6 +4,33 @@ import { useEffect } from "react";
 
 export function ServiceWorkerRegistration() {
   useEffect(() => {
+    const syncTheme = () => {
+      try {
+        const saved = globalThis.localStorage?.getItem("tether-theme") ?? "system";
+        const prefersDark =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const effectiveDark = saved === "dark" || (saved !== "light" && prefersDark);
+        document.documentElement.setAttribute("data-theme", effectiveDark ? "dark" : "light");
+      } catch {
+        // ignore storage errors
+      }
+    };
+
+    syncTheme();
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+    media?.addEventListener("change", syncTheme);
+    window.addEventListener("storage", syncTheme);
+    return () => {
+      media?.removeEventListener("change", syncTheme);
+      window.removeEventListener("storage", syncTheme);
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       process.env.NODE_ENV !== "production" ||
       !("serviceWorker" in navigator) ||

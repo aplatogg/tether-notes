@@ -43,12 +43,22 @@ export function ReminderControl({
   onChange: (changes: Partial<Note>) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const value = note.reminderAt ? toLocalInput(note.reminderAt) : "";
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
 
   if (readOnly && !note.reminderAt) return null;
 
   return (
-    <div className="reminder-control">
+    <div className="reminder-control" ref={wrapRef}>
       <button
         className="icon-button"
         type="button"

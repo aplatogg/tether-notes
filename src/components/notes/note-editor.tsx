@@ -56,7 +56,7 @@ interface NoteEditorProps {
   workspaces: Workspace[];
   onChange: (changes: Partial<Note>) => void;
   onSave: () => void;
-  onDuplicate?: () => void;
+  onDuplicate?: (decryptedBody?: string) => void;
   onTogglePin: () => void;
   onToggleArchive: () => void;
   onDelete: () => void;
@@ -115,6 +115,7 @@ export function NoteEditor({
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const exportWrapRef = useRef<HTMLDivElement>(null);
+  const encryptSeqRef = useRef(0);
 
   useEffect(() => {
     if (!exportOpen) return;
@@ -163,8 +164,12 @@ export function NoteEditor({
     if (!note) return;
     if (note.lockHash && activePin) {
       setDecryptedBodies((current) => ({ ...current, [note.id]: html }));
+      encryptSeqRef.current += 1;
+      const seq = encryptSeqRef.current;
       void encryptLockedBody(html, activePin, note.lockHash).then((ciphertext) => {
-        onChange({ body: ciphertext });
+        if (seq === encryptSeqRef.current) {
+          onChange({ body: ciphertext });
+        }
       });
       return;
     }
@@ -402,7 +407,7 @@ export function NoteEditor({
                     <button
                       className="icon-button"
                       type="button"
-                      onClick={onDuplicate}
+                      onClick={() => onDuplicate(displayBody)}
                       aria-label="Duplicate note"
                       title="Duplicate note"
                       disabled={locked}

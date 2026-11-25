@@ -246,7 +246,19 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
     return "system";
   });
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const accountControlRef = useRef<HTMLDivElement>(null);
   const draftRevision = useRef(0);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!accountControlRef.current?.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [accountOpen]);
 
   useEffect(() => {
     const applyTheme = (mode: ThemeMode) => {
@@ -553,8 +565,8 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
     }
   }
 
-  async function handleDuplicate() {
-    if (!activeDraft || activeDraft.lockHash) return;
+  async function handleDuplicate(decryptedBody?: string) {
+    if (!activeDraft) return;
     flushCurrentDraft();
 
     try {
@@ -564,7 +576,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
       const saved = await workspace.saveNote({
         ...created,
         title: copyTitle,
-        body: activeDraft.body,
+        body: decryptedBody !== undefined ? decryptedBody : activeDraft.body,
         tags: [...activeDraft.tags],
         folder: activeDraft.folder ?? DEFAULT_GROUP,
         workspaceId: activeDraft.workspaceId ?? null,
@@ -1208,17 +1220,30 @@ async function handleDeleteForever() {
         <div className="sidebar-tags">
           <p><Tags aria-hidden="true" /> Tags</p>
           {tags.length > 0 ? (
-            tags.slice(0, 8).map(([tag, count]) => (
-              <button
-                className={selectedTag === tag ? "is-active" : undefined}
-                type="button"
-                key={tag}
-                onClick={() => handleTagSelect(tag)}
-              >
-                <span style={{ color: tagColor(tag).ink }}>#{tag}</span>
-                <span className="num">{count}</span>
-              </button>
-            ))
+            tags.slice(0, 8).map(([tag, count]) => {
+              const swatch = tagColor(tag);
+              return (
+                <button
+                  className={selectedTag === tag ? "is-active" : undefined}
+                  type="button"
+                  key={tag}
+                  onClick={() => handleTagSelect(tag)}
+                >
+                  <span
+                    className="sidebar-tag-label"
+                    style={
+                      {
+                        "--tag-ink": swatch.ink,
+                        "--tag-ink-dark": swatch.darkInk,
+                      } as React.CSSProperties
+                    }
+                  >
+                    #{tag}
+                  </span>
+                  <span className="num">{count}</span>
+                </button>
+              );
+            })
           ) : (
             <span className="tags-empty">Tags added to notes appear here.</span>
           )}
@@ -1512,7 +1537,7 @@ async function handleDeleteForever() {
               <Monitor aria-hidden="true" />
             )}
           </button>
-          <div className="account-control">
+          <div className="account-control" ref={accountControlRef}>
             <button
               className="account-button"
               type="button"
@@ -1633,7 +1658,7 @@ async function handleDeleteForever() {
               workspaces={workspaces}
               onChange={handleDraftChange}
               onSave={flushCurrentDraft}
-              onDuplicate={() => void handleDuplicate()}
+              onDuplicate={(decryptedBody) => void handleDuplicate(decryptedBody)}
               onTogglePin={handleTogglePin}
               onToggleArchive={handleToggleArchive}
               onDelete={() => void handleDelete()}

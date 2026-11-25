@@ -269,29 +269,45 @@ export function NoteList({
                 </span>
                 <span className="note-row-meta">
                   {note.folder?.trim() ? (
-                    <button
-                      type="button"
+                    <span
+                      role="button"
+                      tabIndex={0}
                       className="folder-chip"
                       onClick={(event) => {
                         event.stopPropagation();
                         onFolderSelect(note.folder!.trim());
                       }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onFolderSelect(note.folder!.trim());
+                        }
+                      }}
                     >
                       <Folder aria-hidden="true" /> {note.folder.trim()}
-                    </button>
+                    </span>
                   ) : null}
                   {note.shared ? (
-                    <button
-                      type="button"
+                    <span
+                      role="button"
+                      tabIndex={0}
                       className="folder-chip share-group-chip"
                       title="Assign a share group"
                       onClick={(event) => {
                         event.stopPropagation();
                         openPicker(note);
                       }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openPicker(note);
+                        }
+                      }}
                     >
                       <UsersRound aria-hidden="true" /> {note.shareGroup?.trim() || "Group"}
-                    </button>
+                    </span>
                   ) : null}
                   {note.workspaceId ? (
                     <span className="folder-chip" title="Workspace">
@@ -357,17 +373,27 @@ export function NoteList({
               ) : null}
               {note.tags.length > 0 ? (
                 <span className="note-row-tags" aria-label="Tags">
-                  {note.tags.slice(0, 2).map((tag) => (
-                    <button
-                      className="tag-button"
-                      key={tag}
-                      type="button"
-                      style={{ "--tag-bg": tagColor(tag).bg, "--tag-ink": tagColor(tag).ink } as React.CSSProperties}
-                      onClick={() => onTagSelect(tag)}
-                    >
-                      #{tag}
-                    </button>
-                  ))}
+                  {note.tags.slice(0, 2).map((tag) => {
+                    const swatch = tagColor(tag);
+                    return (
+                      <button
+                        className="tag-button"
+                        key={tag}
+                        type="button"
+                        style={
+                          {
+                            "--tag-bg": swatch.bg,
+                            "--tag-ink": swatch.ink,
+                            "--tag-bg-dark": swatch.darkBg,
+                            "--tag-ink-dark": swatch.darkInk,
+                          } as React.CSSProperties
+                        }
+                        onClick={() => onTagSelect(tag)}
+                      >
+                        #{tag}
+                      </button>
+                    );
+                  })}
                 </span>
               ) : null}
             </article>

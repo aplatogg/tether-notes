@@ -3099,6 +3099,19 @@ html[data-theme="dark"] .note-row-loading span {
   background: var(--surface-soft);
 }
 
+.sidebar-tag-label {
+  color: var(--tag-ink);
+}
+
+html[data-theme="dark"] .sidebar-tag-label {
+  color: var(--tag-ink-dark, var(--ink));
+}
+
+html[data-theme="dark"] .tag-button {
+  color: var(--tag-ink-dark, var(--ink));
+  background: var(--tag-bg-dark, var(--surface-active));
+}
+
 /* ---------- editor metadata pill bar ---------- */
 .editor-meta-bar {
   display: flex;
