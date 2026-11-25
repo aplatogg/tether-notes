@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   Archive,
@@ -186,21 +187,34 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [confirmDeleteWs, setConfirmDeleteWs] = useState(false);
   const [confirmDeleteRow, setConfirmDeleteRow] = useState<string | null>(null);
   const [editingWs, setEditingWs] = useState<{ id: string; name: string } | null>(null);
-  const [wsMenuId, setWsMenuId] = useState<string | null>(null);
+  const [wsMenu, setWsMenu] = useState<{
+    ws: Workspace;
+    top: number;
+    left: number;
+  } | null>(null);
 
-  // A dropdown opened from the workspace row must close on any outside click;
-  // per-button handlers alone would leave it stuck open.
+  // The sidebar section scrolls (`overflow-y: auto`), which clips any absolutely
+  // positioned child — the menu used to be cut off by the box above. Rendering it
+  // through a portal at viewport coordinates keeps it a real popup; scrolling or
+  // resizing closes it so it can never float away from its trigger.
   useEffect(() => {
-    if (wsMenuId === null) return;
-    const close = (event: MouseEvent) => {
+    if (wsMenu === null) return;
+    const close = () => setWsMenu(null);
+    const onPointerDown = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest(".workspace-menu-wrap")) return;
-      setWsMenuId(null);
+      if (target?.closest(".workspace-menu, .workspace-menu-trigger")) return;
+      setWsMenu(null);
       setConfirmDeleteRow(null);
     };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [wsMenuId]);
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [wsMenu]);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -1040,73 +1054,36 @@ async function handleDeleteForever() {
                   </button>
                 )}
                 {editingWs?.id === ws.id ? null : (
-                  <div className="workspace-menu-wrap">
-                    <button
-                      type="button"
-                      className="workspace-manage"
-                      aria-label={`Actions for ${ws.name}`}
-                      aria-haspopup="menu"
-                      aria-expanded={wsMenuId === ws.id}
-                      title="More"
-                      onClick={() => {
-                        setConfirmDeleteRow(null);
-                        setWsMenuId((current) => (current === ws.id ? null : ws.id));
-                      }}
-                    >
-                      <MoreHorizontal aria-hidden="true" />
-                    </button>
-                    {wsMenuId === ws.id ? (
-                      <div className="workspace-menu" role="menu">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setWsMenuId(null);
-                            void openMembersDialog(ws);
-                          }}
-                        >
-                          <UsersRound aria-hidden="true" /> Members
-                        </button>
-                        {ws.role === "owner" ? (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setWsMenuId(null);
-                              setEditingWs({ id: ws.id, name: ws.name });
-                            }}
-                          >
-                            <Pencil aria-hidden="true" /> Rename
-                          </button>
-                        ) : null}
-                        {ws.role === "owner" ? (
-                          confirmDeleteRow === ws.id ? (
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="is-danger"
-                              onClick={() => {
-                                setWsMenuId(null);
-                                setConfirmDeleteRow(null);
-                                void handleDeleteWorkspaceById(ws.id);
-                              }}
-                            >
-                              <Check aria-hidden="true" /> Confirm delete
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="is-danger"
-                              onClick={() => setConfirmDeleteRow(ws.id)}
-                            >
-                              <Trash2 aria-hidden="true" /> Delete workspace
-                            </button>
-                          )
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
+                  <button
+                    type="button"
+                    className="workspace-manage workspace-menu-trigger"
+                    aria-label={`Actions for ${ws.name}`}
+                    aria-haspopup="menu"
+                    aria-expanded={wsMenu?.ws.id === ws.id}
+                    title="More"
+                    onClick={(event) => {
+                      setConfirmDeleteRow(null);
+                      if (wsMenu?.ws.id === ws.id) {
+                        setWsMenu(null);
+                        return;
+                      }
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const width = 184;
+                      const height = 148;
+                      const below = window.innerHeight - rect.bottom;
+                      const top =
+                        below < height + 8
+                          ? Math.max(8, rect.top - height - 4)
+                          : rect.bottom + 4;
+                      const left = Math.min(
+                        Math.max(8, rect.right - width),
+                        window.innerWidth - width - 8,
+                      );
+                      setWsMenu({ ws, top, left });
+                    }}
+                  >
+                    <MoreHorizontal aria-hidden="true" />
+                  </button>
                 )}
               </div>
             ))}
@@ -1233,6 +1210,69 @@ async function handleDeleteForever() {
           <strong>{email ?? "Local workspace"}</strong>
         </div>
       </aside>
+
+      {wsMenu && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="workspace-menu"
+              role="menu"
+              aria-label={`Actions for ${wsMenu.ws.name}`}
+              style={{ position: "fixed", top: wsMenu.top, left: wsMenu.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const picked = wsMenu.ws;
+                  setWsMenu(null);
+                  void openMembersDialog(picked);
+                }}
+              >
+                <UsersRound aria-hidden="true" /> Members
+              </button>
+              {wsMenu.ws.role === "owner" ? (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      const picked = wsMenu.ws;
+                      setWsMenu(null);
+                      setEditingWs({ id: picked.id, name: picked.name });
+                    }}
+                  >
+                    <Pencil aria-hidden="true" /> Rename
+                  </button>
+                  {confirmDeleteRow === wsMenu.ws.id ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="is-danger"
+                      onClick={() => {
+                        const pickedId = wsMenu.ws.id;
+                        setWsMenu(null);
+                        setConfirmDeleteRow(null);
+                        void handleDeleteWorkspaceById(pickedId);
+                      }}
+                    >
+                      <Check aria-hidden="true" /> Confirm delete
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="is-danger"
+                      onClick={() => setConfirmDeleteRow(wsMenu.ws.id)}
+                    >
+                      <Trash2 aria-hidden="true" /> Delete workspace
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {membersDialog ? (
         <div className="pin-backdrop" role="dialog" aria-modal="true" aria-label={`Members of ${membersDialog.name}`}>

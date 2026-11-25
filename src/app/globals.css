@@ -2311,11 +2311,6 @@ button:disabled {
   font-size: 13px;
 }
 
-.workspace-menu-wrap {
-  position: relative;
-  flex: 0 0 auto;
-}
-
 .workspace-menu {
   position: absolute;
   top: calc(100% + 4px);
