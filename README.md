@@ -106,6 +106,8 @@ Vercel project `plato-ba85/tether-notes` auto-deploys every push to `main` → *
 - Sync runs while the app is open (no Background Sync yet)
 - Last-write-wins per whole note; simultaneous edits to the same note don't merge at the character level
 - Local-only notes aren't migrated into an account automatically
+- CSP allows `connect-src https:` on purpose: the BYOK AI summary posts to whatever OpenAI-compatible endpoint the user configures, and a static CSP cannot vary per user. Routing the call through our server would close this, but it would break the promise on `/privacy` that the server never sees the key. Inline scripts are blocked with a per-request nonce, so this only matters if an XSS sink survives elsewhere.
+- Trusted Types ships as `Content-Security-Policy-Report-Only`; once the console stays quiet it can be enforced.
 
 ## 📜 License
 
