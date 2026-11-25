@@ -12,6 +12,8 @@ import {
   LoaderCircle,
   Lock,
   LockOpen,
+  Maximize2,
+  Minimize2,
   Paperclip,
   Pin,
   PinOff,
@@ -62,6 +64,8 @@ interface NoteEditorProps {
   onBack: () => void;
   onCreate: () => void;
   hiddenOnMobile: boolean;
+  focusMode?: boolean;
+  onToggleFocusMode?: () => void;
 }
 
 function noteStateLabel(note: Note, isDirty: boolean, isLocalOnly: boolean): string {
@@ -91,6 +95,8 @@ export function NoteEditor({
   onBack,
   onCreate,
   hiddenOnMobile,
+  focusMode = false,
+  onToggleFocusMode,
 }: NoteEditorProps) {
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
   const [unlockedPins, setUnlockedPins] = useState<Record<string, string>>({});
@@ -339,6 +345,18 @@ export function NoteEditor({
             <button className="icon-button mobile-back" type="button" onClick={onBack} aria-label="Back to notes">
               <ChevronLeft aria-hidden="true" />
             </button>
+            {onToggleFocusMode ? (
+              <button
+                className={focusMode ? "icon-button focus-toggle is-active" : "icon-button focus-toggle"}
+                type="button"
+                onClick={onToggleFocusMode}
+                aria-label={focusMode ? "Exit Focus mode" : "Enter Focus mode"}
+                aria-pressed={focusMode}
+                title={focusMode ? "Exit Focus mode (Ctrl/Cmd + \\)" : "Focus / Zen mode (Ctrl/Cmd + \\)"}
+              >
+                {focusMode ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+              </button>
+            ) : null}
             <span className="editor-save-state" role="status">
               {noteStateLabel(note, isDirty, isLocalOnly)}
             </span>

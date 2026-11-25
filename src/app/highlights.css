@@ -13,10 +13,23 @@
   --hl-orange-ink: #4a2a09;
 }
 
+html[data-theme="dark"] {
+  --hl-yellow: #4d4210;
+  --hl-yellow-ink: #fef08a;
+  --hl-green: #113e27;
+  --hl-green-ink: #bbf7d0;
+  --hl-pink: #4a1932;
+  --hl-pink-ink: #fbcfe8;
+  --hl-blue: #153457;
+  --hl-blue-ink: #bfdbfe;
+  --hl-orange: #4d290a;
+  --hl-orange-ink: #fed7aa;
+}
+
 @media (prefers-color-scheme: dark) {
-  /* The app shell stays light, so these are dimmer rather than dark: the paper
-     tone drops without making the ink unreadable. */
-  :root {
+  /* The app shell stays light unless dark theme is active, so these are dimmer
+     rather than dark when in light mode. */
+  html:not([data-theme="dark"]) {
     --hl-yellow: #e7d888;
     --hl-yellow-ink: #322a05;
     --hl-green: #a9dcb9;

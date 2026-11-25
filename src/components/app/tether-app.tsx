@@ -23,11 +23,14 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  Monitor,
+  Moon,
   MoreHorizontal,
   Pencil,
   Pin,
   Plus,
   Search,
+  Sun,
   Tags,
   Trash2,
   Upload,
@@ -37,6 +40,7 @@ import {
   X,
 } from "lucide-react";
 import { AuthPanel } from "@/components/auth/auth-panel";
+import { CommandPalette, type ThemeMode } from "@/components/app/command-palette";
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
 import {
@@ -230,8 +234,49 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
   const [navOpen, setNavOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    try {
+      const saved = globalThis.localStorage?.getItem("tether-theme");
+      if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    } catch {
+      // default to system
+    }
+    return "system";
+  });
   const searchInputRef = useRef<HTMLInputElement>(null);
   const draftRevision = useRef(0);
+
+  useEffect(() => {
+    const applyTheme = (mode: ThemeMode) => {
+      const prefersDark =
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const effectiveDark = mode === "dark" || (mode === "system" && prefersDark);
+      document.documentElement.setAttribute("data-theme", effectiveDark ? "dark" : "light");
+    };
+
+    applyTheme(themeMode);
+    try {
+      globalThis.localStorage?.setItem("tether-theme", themeMode);
+    } catch {
+      // ignore storage errors
+    }
+
+    if (themeMode !== "system" || typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const listener = () => applyTheme("system");
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [themeMode]);
+
+  function cycleTheme() {
+    setThemeMode((current) =>
+      current === "light" ? "dark" : current === "dark" ? "system" : "light",
+    );
+  }
 
   const storedSelected = workspace.notes?.find((note) => note.id === selectedId);
   const candidateDraft = isDirty ? draft : (storedSelected ?? draft);
@@ -899,7 +944,13 @@ async function handleDeleteForever() {
 
     if (command && event.key.toLowerCase() === "k") {
       event.preventDefault();
-      searchInputRef.current?.focus();
+      setPaletteOpen((open) => !open);
+      return;
+    }
+
+    if (command && event.key === "\\") {
+      event.preventDefault();
+      setFocusMode((value) => !value);
       return;
     }
 
@@ -918,6 +969,7 @@ async function handleDeleteForever() {
     }
 
     if (event.key === "Escape") {
+      setPaletteOpen(false);
       setAccountOpen(false);
       if (mobilePane === "editor") setMobilePane("list");
     }
@@ -942,7 +994,7 @@ async function handleDeleteForever() {
   }
 
   return (
-    <main className="app-frame">
+    <main className={focusMode ? "app-frame is-focus-mode" : "app-frame"}>
       {navOpen ? (
         <div
           className="nav-backdrop"
@@ -1431,10 +1483,35 @@ async function handleDeleteForever() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search notes"
           />
-          <kbd>⌘ K</kbd>
+          <button
+            type="button"
+            className="palette-trigger-kbd"
+            onClick={(event) => {
+              event.preventDefault();
+              setPaletteOpen(true);
+            }}
+            title="Open Command Palette (Ctrl/Cmd + K)"
+          >
+            ⌘ K
+          </button>
         </label>
         <div className="topbar-actions">
           <SyncIndicator state={workspace.syncState} onRetry={() => void workspace.retrySync()} />
+          <button
+            className="icon-button theme-toggle"
+            type="button"
+            onClick={cycleTheme}
+            aria-label={`Theme: ${themeMode}`}
+            title={`Theme: ${themeMode} (click to switch Light / Dark / System)`}
+          >
+            {themeMode === "dark" ? (
+              <Moon aria-hidden="true" />
+            ) : themeMode === "light" ? (
+              <Sun aria-hidden="true" />
+            ) : (
+              <Monitor aria-hidden="true" />
+            )}
+          </button>
           <div className="account-control">
             <button
               className="account-button"
@@ -1568,9 +1645,29 @@ async function handleDeleteForever() {
               }}
               onCreate={() => void handleCreate()}
               hiddenOnMobile={mobilePane === "list"}
+              focusMode={focusMode}
+              onToggleFocusMode={() => setFocusMode((value) => !value)}
             />
         </div>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        notes={notesWithDraft}
+        workspaces={workspaces}
+        folders={folders}
+        themeMode={themeMode}
+        focusMode={focusMode}
+        onClose={() => setPaletteOpen(false)}
+        onSelectNote={handleSelect}
+        onCreateNote={() => void handleCreate()}
+        onSelectScope={handleScope}
+        onSelectWorkspace={handleWorkspaceSelect}
+        onSelectFolder={handleFolderSelect}
+        onChangeTheme={setThemeMode}
+        onToggleFocusMode={() => setFocusMode((value) => !value)}
+        onExportAll={handleExport}
+      />
     </main>
   );
 }
