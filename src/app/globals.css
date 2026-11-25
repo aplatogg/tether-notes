@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --frame: #eaf0f2;
-  --frame-deep: #e1e9ec;
-  --surface: #ffffff;
-  --surface-soft: #f6f8f9;
-  --surface-active: #e8edef;
-  --sheet-border: #dce4e7;
-  --rule: #edf1f2;
-  --control: #c9d3d7;
+  --frame: #d8e1e5;
+  --frame-deep: #ced9de;
+  --surface: #edf2f4;
+  --surface-soft: #e3eaed;
+  --surface-active: #d5dfe3;
+  --sheet-border: #c5d1d6;
+  --rule: #d6e0e4;
+  --control: #b5c3c9;
   --ink: #142126;
-  --muted: #54646b;
-  --faint: #66777e;
+  --muted: #4b5b62;
+  --faint: #5f7077;
   --accent: #0f766e;
-  --accent-soft: #d9efec;
+  --accent-soft: #cbe6e2;
   --negative: #b4232d;
-  --negative-soft: #ffeaec;
+  --negative-soft: #f5dce0;
   --positive: #236b4d;
   --radius-sheet: 16px;
   --radius-control: 7px;
@@ -2248,7 +2248,7 @@ button:disabled {
   padding: 0 8px;
   border: 1px solid #e2c9a8;
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
   color: #7a4a12;
   font-size: 12px;
   font-weight: 600;
@@ -2292,7 +2292,7 @@ button:disabled {
   padding: 12px;
   border: 1px solid var(--sheet-border);
   border-radius: 10px;
-  background: var(--sheet-bg, #fff);
+  background: var(--surface);
   box-shadow: 0 12px 32px rgba(15, 60, 55, 0.18);
 }
 
