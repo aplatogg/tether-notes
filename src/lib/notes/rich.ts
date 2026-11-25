@@ -83,6 +83,77 @@ export function markdownToHtml(body: string): string {
   return html.join("") || "<p></p>";
 }
 
+/** Schemes a note may link to. Relative URLs are allowed separately. */
+const SAFE_URL_SCHEME = /^(?:https?:|mailto:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i;
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+function isSafeUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (SAFE_URL_SCHEME.test(trimmed)) return true;
+  // Anything without a scheme is a relative reference and stays in-app.
+  return !HAS_SCHEME.test(trimmed);
+}
+
+function closestTaskItem(element: Element): Element | null {
+  let node: Element | null = element.parentElement;
+  while (node) {
+    if (node.tagName === "LI" && node.getAttribute("data-type") === "taskItem") return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+// Hooks run for every sanitizeHtml() call, which is the only path that writes
+// remote HTML into the DOM. They narrow what DOMPurify's allowlist already lets
+// through, rather than replacing it.
+DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
+  // DOMPurify's global ALLOWED_URI_REGEXP also vets unrelated attributes, which
+  // dropped start="3" and type="checkbox". Scheme checks live here instead.
+  if (data.attrName === "href" || data.attrName === "src") {
+    if (!isSafeUrl(data.attrValue)) data.keepAttr = false;
+  }
+});
+
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  const element = node as Element;
+
+  if (element.tagName === "INPUT") {
+    // Only the disabled checkbox a task list renders survives; this removes the
+    // fake-password-field shape a phishing overlay needs.
+    const type = (element.getAttribute("type") ?? "").toLowerCase();
+    const parent = element.parentElement;
+    const validTaskCheckbox =
+      type === "checkbox" && parent?.tagName === "LABEL" && closestTaskItem(element) !== null;
+    if (!validTaskCheckbox) {
+      element.remove();
+      return;
+    }
+    for (const attribute of [...element.attributes]) {
+      if (attribute.name !== "type" && attribute.name !== "disabled") {
+        element.removeAttribute(attribute.name);
+      }
+    }
+    element.setAttribute("type", "checkbox");
+    element.setAttribute("disabled", "");
+    return;
+  }
+
+  if (element.tagName === "LABEL" && closestTaskItem(element) === null) {
+    element.remove();
+    return;
+  }
+
+  if (element.tagName === "A") {
+    element.setAttribute("rel", "noopener noreferrer nofollow ugc");
+    // Relative links stay in-app; external ones open in a new tab safely.
+    if (/^https?:\/\//i.test(element.getAttribute("href") ?? "")) {
+      element.setAttribute("target", "_blank");
+    } else {
+      element.removeAttribute("target");
+    }
+  }
+});
+
 export function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
@@ -91,12 +162,13 @@ export function sanitizeHtml(html: string): string {
       "table", "tbody", "thead", "tr", "th", "td", "colgroup", "col", "span", "div",
       "label", "input",
     ],
+    // No style and no class: a shared note must not restyle or overlay the page.
+    // Links are checked by the hook above; data-* and list attrs stay for the editor.
     ALLOWED_ATTR: [
-      "href", "target", "rel", "src", "alt", "title", "class", "data-type",
-      "data-checked", "colspan", "rowspan", "colwidth", "style",
-      "type", "checked", "disabled",
+      "href", "target", "rel", "src", "alt", "title", "data-type",
+      "data-checked", "colspan", "rowspan", "colwidth", "start",
+      "type", "disabled",
     ],
-    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i,
   });
 }
 

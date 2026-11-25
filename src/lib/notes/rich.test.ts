@@ -55,3 +55,87 @@ describe("rich body helpers", () => {
     expect(countWords("")).toBe(0);
   });
 });
+
+describe("sanitizeHtml hardening", () => {
+  it("drops the full-screen overlay and the fake login field", () => {
+    const dirty =
+      '<div style="position:fixed;inset:0;z-index:99999;background:#fff">' +
+      '<label style="font:16px sans-serif">Sign in to continue</label>' +
+      '<input type="password" name="pw" placeholder="Password">' +
+      "</div>";
+
+    const clean = sanitizeHtml(dirty);
+
+    expect(clean).not.toContain("position");
+    expect(clean).not.toContain("inset");
+    expect(clean).not.toContain("z-index");
+    expect(clean).not.toContain("background");
+    expect(clean).not.toContain("<input");
+    expect(clean).not.toContain("<label");
+  });
+
+  it("drops style and class entirely", () => {
+    const clean = sanitizeHtml(
+      '<p class="app-frame" style="text-align: center; width: 40%; position: absolute">x</p>',
+    );
+
+    expect(clean).not.toContain("style=");
+    expect(clean).not.toContain("class=");
+    expect(clean).toContain("<p>x</p>");
+  });
+
+  it("preserves the editor's task list markup", () => {
+    // Exact shape stored by the TipTap task list in note MENYURAT.
+    const taskHtml =
+      '<ul data-type="taskList">' +
+      '<li data-checked="false" data-type="taskItem">' +
+      '<label><input type="checkbox" checked><span></span></label>' +
+      "<div><p>Mistral PRO</p></div>" +
+      "</li></ul>";
+
+    const clean = sanitizeHtml(taskHtml);
+
+    expect(clean).toContain('data-type="taskList"');
+    expect(clean).toContain('data-type="taskItem"');
+    expect(clean).toContain('data-checked="false"');
+    expect(clean).toContain("<label>");
+    expect(clean).toContain('<input type="checkbox" disabled="">');
+    // Multiple checkboxes per row could re-create a form; the state attribute
+    // belongs on the li, so the input's own checked flag is stripped.
+    expect(clean).not.toMatch(/<input[^>]*\schecked/);
+  });
+
+  it("removes checkboxes that are not inside a task item", () => {
+    const clean = sanitizeHtml('<p><label><input type="checkbox"></label></p>');
+
+    expect(clean).not.toContain("<input");
+    expect(clean).not.toContain("<label");
+    expect(clean).toContain("<p></p>");
+  });
+
+  it("normalizes link target and rel", () => {
+    const external = sanitizeHtml('<a href="https://example.com" target="_self">x</a>');
+    expect(external).toContain('rel="noopener noreferrer nofollow ugc"');
+    expect(external).toContain('target="_blank"');
+
+    const internal = sanitizeHtml('<a href="/notes" target="_blank">x</a>');
+    expect(internal).not.toContain("target=");
+  });
+
+  it("keeps ordered-list start numbers", () => {
+    expect(sanitizeHtml('<ol start="3"><li>three</li></ol>')).toContain('start="3"');
+  });
+
+  it("allows only safe link and image schemes", () => {
+    expect(sanitizeHtml('<a href="https://example.com">ok</a>')).toContain('href="https://example.com"');
+    expect(sanitizeHtml('<a href="/notes">ok</a>')).toContain('href="/notes"');
+    expect(sanitizeHtml('<a href="javascript:alert(1)">x</a>')).not.toContain("javascript:");
+    expect(sanitizeHtml('<a href="data:text/html;base64,AA">x</a>')).not.toContain("data:text");
+
+    expect(sanitizeHtml('<img src="data:image/png;base64,iVBORw0KGgo=" alt="x">')).toContain(
+      'src="data:image/png;base64,iVBORw0KGgo="',
+    );
+    expect(sanitizeHtml('<img src="data:text/html;base64,AA" alt="x">')).not.toContain("data:text");
+    expect(sanitizeHtml('<img src="file:///etc/passwd" alt="x">')).not.toContain("file:");
+  });
+});

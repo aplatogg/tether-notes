@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import "@fontsource/ibm-plex-sans/400.css";
@@ -35,7 +36,16 @@ export const viewport: Viewport = {
   themeColor: "#eaf0f2",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  // A nonce-based CSP is injected per request by src/proxy.ts, and Next can only
+  // stamp the nonce on scripts during server rendering. Awaiting connection()
+  // opts the web build into per-request rendering; the Tauri build is a static
+  // export with no request, so it keeps prerendering and the static CSP from
+  // tauri.conf.json.
+  if (process.env.TAURI_BUILD !== "1") {
+    await connection();
+  }
+
   return (
     <html lang="en">
       <body>

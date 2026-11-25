@@ -287,8 +287,11 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
             }
           },
         )
-        .subscribe((status, error) => {
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+.subscribe((status, error) => {
+          // CLOSED covers a channel the server closed (not a local unsubscribe:
+          // the engine sets its stopping flag before releasing). Reporting it lets
+          // the engine drop the stale handle and rebuild the subscription.
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             onError(error ?? new Error(`Realtime subscription ${status.toLowerCase()}`));
           }
         });
@@ -305,7 +308,11 @@ export function createSupabaseSyncAdapter(client: SupabaseClient): SyncAdapter {
               .catch(onError);
           },
         )
-        .subscribe();
+        .subscribe((status, error) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            onError(error ?? new Error(`Workspace subscription ${status.toLowerCase()}`));
+          }
+        });
 
       return async () => {
         await client.removeChannel(channel);

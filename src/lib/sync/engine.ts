@@ -70,6 +70,8 @@ private readonly now: () => string;
   private state: SyncEngineState = { phase: "idle", pending: 0, attempt: 0 };
   private syncPromise: Promise<void> | null = null;
   private releaseSubscription: (() => void | Promise<void>) | null = null;
+  private subscriptionInFlight: Promise<void> | null = null;
+  private stopping = false;
   private pollTimer: ReturnType<typeof globalThis.setInterval> | null = null;
   private lastPullAt = 0;
 
@@ -124,45 +126,122 @@ async start(): Promise<void> {
     // Background refresh: realtime channels can silently drop (sleep, NAT
     // timeout, missed WAL slot), leaving a stale list until the next user action.
     this.startPolling();
+    this.installConnectionListeners();
 
-    if (!this.adapter?.subscribe || this.releaseSubscription || !this.isOnline()) {
-      return;
-    }
-
-    this.releaseSubscription = await this.adapter.subscribe(
-      this.userId,
-      async (note) => {
-        await this.repository.mergeRemote(note);
-        await this.refreshPendingState();
-        for (const listener of this.remoteListeners) listener({ type: "note", note });
-      },
-      (error) => {
-        this.setState({
-          ...this.state,
-          phase: "error",
-          error: errorMessage(error),
-        });
-      },
-      async (noteId) => {
-        // A remote hard delete (e.g. trash purge on another device): drop the
-        // local row too, unless we have a pending local mutation for it.
-        const pending = (await this.repository.listOutbox(this.userId)).some(
-          (mutation) => mutation.noteId === noteId,
-        );
-        if (!pending) {
-          await this.repository.hardDelete(noteId);
-        }
-        await this.refreshPendingState();
-        for (const listener of this.remoteListeners) listener({ type: "delete", noteId });
-      },
-    );
+    await this.ensureSubscription();
   }
 
 async stop(): Promise<void> {
+    this.stopping = true;
+    this.removeConnectionListeners();
     this.stopPolling();
     const release = this.releaseSubscription;
     this.releaseSubscription = null;
-    await release?.();
+    try {
+      await release?.();
+    } finally {
+      this.stopping = false;
+    }
+  }
+
+  /**
+   * Opens the realtime channel if none is live. Idempotent: a live release
+   * handle or an in-flight attempt short-circuits, so online events, poll
+   * ticks and retries cannot stack duplicate channels.
+   */
+  async ensureSubscription(): Promise<void> {
+    const adapter = this.adapter;
+    const subscribe = adapter?.subscribe;
+    if (!subscribe || this.releaseSubscription || this.subscriptionInFlight) {
+      return;
+    }
+    if (!this.isOnline()) return;
+
+    const attempt = (async () => {
+      let release: (() => void | Promise<void>) | null = null;
+      try {
+        release = await subscribe(
+          this.userId,
+          async (note) => {
+            await this.repository.mergeRemote(note);
+            await this.refreshPendingState();
+            for (const listener of this.remoteListeners) listener({ type: "note", note });
+          },
+          (error) => {
+            if (this.stopping) return;
+            // A channel that errors or closes is dead: forget its handle and
+            // drop it so the next online/poll tick can build a fresh one.
+            if (this.releaseSubscription === release) {
+              this.releaseSubscription = null;
+            }
+            if (release) void release();
+            this.setState({
+              ...this.state,
+              phase: "error",
+              error: errorMessage(error),
+            });
+          },
+          async (noteId) => {
+            // A remote hard delete (e.g. trash purge on another device): drop the
+            // local row too, unless we have a pending local mutation for it.
+            const pending = (await this.repository.listOutbox(this.userId)).some(
+              (mutation) => mutation.noteId === noteId,
+            );
+            if (!pending) {
+              await this.repository.hardDelete(noteId);
+            }
+            await this.refreshPendingState();
+            for (const listener of this.remoteListeners) listener({ type: "delete", noteId });
+          },
+        );
+      } catch (error) {
+        if (!this.stopping) {
+          this.setState({
+            ...this.state,
+            phase: "error",
+            error: errorMessage(error),
+          });
+        }
+        return;
+      }
+
+      // stop() or another attempt may have won the race while subscribing.
+      if (this.stopping || this.releaseSubscription) {
+        await release?.();
+        return;
+      }
+      this.releaseSubscription = release;
+    })();
+
+    this.subscriptionInFlight = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (this.subscriptionInFlight === attempt) this.subscriptionInFlight = null;
+    }
+  }
+
+  private readonly handleOnline = (): void => {
+    if (this.stopping) return;
+    void this.ensureSubscription();
+    void this.sync();
+  };
+
+  private readonly handleOffline = (): void => {
+    if (this.stopping) return;
+    void this.sync();
+  };
+
+  private installConnectionListeners(): void {
+    if (typeof window === "undefined") return;
+    window.addEventListener("online", this.handleOnline);
+    window.addEventListener("offline", this.handleOffline);
+  }
+
+  private removeConnectionListeners(): void {
+    if (typeof window === "undefined") return;
+    window.removeEventListener("online", this.handleOnline);
+    window.removeEventListener("offline", this.handleOffline);
   }
 
   private startPolling(): void {
@@ -172,6 +251,8 @@ async stop(): Promise<void> {
       // return), or while a sync is already in flight; sync() is idempotent.
       if (!this.isOnline()) return;
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      // A channel that died silently gets rebuilt here without extra requests.
+      void this.ensureSubscription();
       void this.sync();
     }, this.pollIntervalMs);
   }

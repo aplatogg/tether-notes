@@ -447,4 +447,71 @@ describe("SyncEngine", () => {
     expect(await repository.get("busy-note")).toBeDefined();
     expect(await repository.listOutbox(USER_ID)).toHaveLength(1);
   });
+
+  test("starts offline without a channel and subscribes when the network returns", async () => {
+    let online = false;
+    const subscribe = vi.fn(() => () => undefined);
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({ subscribe }),
+      USER_ID,
+      { isOnline: () => online, pollIntervalMs: 0, sleep: async () => undefined },
+    );
+
+    await engine.start();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(engine.getState().phase).toBe("offline");
+
+    online = true;
+    window.dispatchEvent(new Event("online"));
+    await flush();
+
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    // A repeated online event must not stack a second channel.
+    window.dispatchEvent(new Event("online"));
+    await flush();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+
+    await engine.stop();
+    // stop() removes the listener: a later online event is ignored.
+    window.dispatchEvent(new Event("online"));
+    await flush();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  test("drops a dead channel so it can be rebuilt", async () => {
+    let onError: ((error: unknown) => void) | undefined;
+    const release = vi.fn();
+    const subscribe = vi.fn(
+      (_userId: string, _onNote: unknown, errorListener: (error: unknown) => void) => {
+        onError = errorListener;
+        return release;
+      },
+    );
+    const engine = new SyncEngine(
+      repository,
+      createAdapter({ subscribe }),
+      USER_ID,
+      { pollIntervalMs: 0, sleep: async () => undefined },
+    );
+
+    await engine.start();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+
+    onError?.(new Error("channel closed"));
+    await flush();
+
+    expect(release).toHaveBeenCalled();
+    expect(engine.getState()).toMatchObject({ phase: "error" });
+
+    // The handle was forgotten, so the engine can reconnect.
+    await engine.ensureSubscription();
+    expect(subscribe).toHaveBeenCalledTimes(2);
+
+    await engine.stop();
+  });
 });
+
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

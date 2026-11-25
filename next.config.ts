@@ -4,24 +4,11 @@ const isDevelopment = process.env.NODE_ENV === "development";
 // Tauri bundles a static export; Vercel keeps the normal Next.js build.
 const isTauriBuild = process.env.TAURI_BUILD === "1";
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  // BYOK AI summary posts to the user's own OpenAI-compatible endpoint, so any https origin must be allowed.
-  "connect-src 'self' https: wss:",
-  "worker-src 'self'",
-  "manifest-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
+// The Content-Security-Policy is set per request by src/proxy.ts so it can
+// carry a nonce. Setting it here too would intersect the two policies and the
+// old 'unsafe-inline' would survive the nonce.
 
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },

@@ -311,7 +311,14 @@ async function deleteForever(noteId: string): Promise<void> {
     setShareGroup,
     deleteForever,
     purgeExpiredTrash,
-    retrySync: () => engineRef.current?.sync() ?? Promise.resolve(),
+    retrySync: () => {
+      const engine = engineRef.current;
+      if (!engine) return Promise.resolve();
+      // A dead realtime channel is usually why the user sees the error: rebuild
+      // it alongside the pull instead of waiting for the next poll tick.
+      void engine.ensureSubscription();
+      return engine.sync();
+    },
     // View changes are cheap to refresh but frequent, so they share the engine's
     // minimum-pull-interval gate instead of firing a request per click.
     refreshView: () => engineRef.current?.syncSoon() ?? Promise.resolve(),

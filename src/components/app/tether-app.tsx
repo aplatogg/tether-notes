@@ -61,6 +61,8 @@ import {
   ensureNotificationPermission,
   loadFiredReminders,
   notifyDue,
+  reconcileFiredReminders,
+  reminderKey,
   saveFiredReminders,
 } from "@/lib/notes/reminder";
 import { useNotesWorkspace } from "@/hooks/use-notes-workspace";
@@ -834,14 +836,20 @@ async function handleDeleteForever() {
   useEffect(() => {
     if (!workspace.notes) return;
     const check = () => {
-      const fired = loadFiredReminders();
-      const due = dueReminders(workspace.notes ?? [], new Date(), fired);
-      if (due.length === 0) return;
+      const now = new Date();
+      const { fired, changed } = reconcileFiredReminders(
+        workspace.notes ?? [],
+        loadFiredReminders(),
+        now,
+      );
+      const due = dueReminders(workspace.notes ?? [], now, fired);
       due.forEach((note) => {
-        fired.add(note.id);
+        const key = reminderKey(note);
+        if (key) fired.add(key);
         void notifyDue(note);
       });
-      saveFiredReminders(fired);
+      // Persist on a fired reminder or whenever pruning/migration rewrote the set.
+      if (changed || due.length > 0) saveFiredReminders(fired);
     };
     check();
     const timer = window.setInterval(check, 30_000);
