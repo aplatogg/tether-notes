@@ -457,14 +457,24 @@ button:disabled {
 .account-menu > button {
   display: flex;
   align-items: center;
-  min-height: 36px;
-  margin-top: 14px;
+  min-height: 34px;
+  margin-top: 8px;
   padding: 0 8px;
   border: 0;
   border-radius: 6px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  gap: 8px;
+}
+
+.account-menu > button:hover {
+  background: var(--surface-active);
+}
+
+.account-menu > button.signout-button {
+  margin-top: 12px;
   color: var(--negative);
   background: var(--negative-soft);
-  gap: 8px;
 }
 
 .account-menu > button svg {

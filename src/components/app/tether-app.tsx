@@ -20,7 +20,6 @@ import {
   Download,
   FileText,
   Folder,
-  Highlighter,
   LoaderCircle,
   LogOut,
   Menu,
@@ -40,8 +39,6 @@ import {
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
-import { AllHighlightsDialog } from "@/components/notes/highlight-panel";
-import { bodyHasHighlight } from "@/lib/notes/highlight";
 import {
   DEFAULT_GROUP,
   collectFolders,
@@ -160,10 +157,11 @@ interface WorkspaceProps {
   adapter: SyncAdapter | null;
   client: SupabaseClient | null;
   onSignOut?: () => Promise<void>;
+  onSignIn?: () => void;
   bootWarning?: string | null;
 }
 
-function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning }: WorkspaceProps) {
+function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, bootWarning }: WorkspaceProps) {
   const workspace = useNotesWorkspace(userId, adapter);
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [scope, setScope] = useState<NoteScope>("all");
@@ -225,12 +223,6 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [importError, setImportError] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [highlightsOpen, setHighlightsOpen] = useState(false);
-  const [highlightsOnly, setHighlightsOnly] = useState(false);
-  const [highlightTarget, setHighlightTarget] = useState<{
-    noteId: string;
-    index: number;
-  } | null>(null);
   const [draft, setDraft] = useState<Note | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [mobilePane, setMobilePane] = useState<"list" | "editor">("list");
@@ -273,14 +265,6 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     selectedFolder ??
     (folderCleared || scope !== "all" || !hasPersonalDefaultGroup ? null : DEFAULT_GROUP);
 
-  const highlightedNotes = useMemo(
-    () =>
-      notesWithDraft.filter(
-        (note) => note.deletedAt === null && !note.lockHash && bodyHasHighlight(note.body),
-      ),
-    [notesWithDraft],
-  );
-
   const filteredNotes = useMemo(
     () =>
       sortNotes(
@@ -297,10 +281,6 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
               ? null
               : (selectedWorkspace ?? undefined),
         }),
-      ).filter(
-        (note) =>
-          !highlightsOnly ||
-          (note.deletedAt === null && !note.lockHash && bodyHasHighlight(note.body)),
       ),
     [
       notesWithDraft,
@@ -311,7 +291,6 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
       calendarDay,
       selectedShareGroup,
       selectedWorkspace,
-      highlightsOnly,
     ],
   );
 
@@ -498,7 +477,6 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
     if (note.id !== selectedId) {
       flushCurrentDraft();
       draftRevision.current += 1;
-      setHighlightTarget(null);
     }
 
     setSelectedId(note.id);
@@ -608,21 +586,6 @@ async function handleDeleteForever() {
       setSelectedFolder(null);
       setFolderCleared(true);
     }
-  }
-
-  function handleOpenHighlight(noteId: string, index: number) {
-    const target = (workspace.notes ?? []).find((note) => note.id === noteId);
-    if (!target) return;
-
-    setHighlightsOpen(false);
-    setHighlightsOnly(false);
-    setQuery("");
-    handleScope("all");
-    setSelectedFolder(null);
-    setFolderCleared(true);
-    setCalendarDay(null);
-    handleSelect(target);
-    setHighlightTarget({ noteId, index });
   }
 
   function handleTagSelect(tag: string) {
@@ -1160,22 +1123,6 @@ async function handleDeleteForever() {
         </nav>
 
         <div className="sidebar-tags">
-          <p><Highlighter aria-hidden="true" /> Highlights</p>
-          <button
-            className={highlightsOnly ? "is-active" : undefined}
-            type="button"
-            onClick={() => setHighlightsOnly((value) => !value)}
-          >
-            <span>Has highlights</span>
-            <span className="num">{highlightedNotes.length}</span>
-          </button>
-          <button type="button" onClick={() => setHighlightsOpen(true)}>
-            <span>All highlights</span>
-            <span className="num">{highlightedNotes.length}</span>
-          </button>
-        </div>
-
-        <div className="sidebar-tags">
           <p><Tags aria-hidden="true" /> Tags</p>
           {tags.length > 0 ? (
             tags.slice(0, 8).map(([tag, count]) => (
@@ -1493,9 +1440,26 @@ async function handleDeleteForever() {
                 </button>
                 {importError ? <p className="form-error" role="alert">{importError}</p> : null}
                 {onSignOut ? (
-                  <button type="button" onClick={() => void handleSignOut()} disabled={isSigningOut}>
+                  <button
+                    type="button"
+                    className="signout-button"
+                    onClick={() => void handleSignOut()}
+                    disabled={isSigningOut}
+                  >
                     <LogOut aria-hidden="true" />
                     {isSigningOut ? "Signing out…" : "Sign out"}
+                  </button>
+                ) : onSignIn ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      flushCurrentDraft();
+                      setAccountOpen(false);
+                      onSignIn();
+                    }}
+                  >
+                    <UserRound aria-hidden="true" />
+                    Sign in to sync
                   </button>
                 ) : (
                   <p>Notes are stored locally in this browser (IndexedDB).</p>
@@ -1549,8 +1513,6 @@ async function handleDeleteForever() {
               onSelectDay={setCalendarDay}
               onCreate={() => void handleCreate()}
               hiddenOnMobile={mobilePane === "editor"}
-              highlightsOnly={highlightsOnly}
-              onToggleHighlightsOnly={() => setHighlightsOnly((value) => !value)}
             />
             <NoteEditor
               note={activeDraft}
@@ -1560,35 +1522,21 @@ async function handleDeleteForever() {
               folders={folders}
               workspaces={workspaces}
               onChange={handleDraftChange}
-            onSave={flushCurrentDraft}
-            onTogglePin={handleTogglePin}
-            onToggleArchive={handleToggleArchive}
-            onDelete={() => void handleDelete()}
-            onRestore={() => void handleRestore()}
-            onDeleteForever={() => void handleDeleteForever()}
-            onBack={() => {
-              flushCurrentDraft();
-              setMobilePane("list");
-            }}
-            onCreate={() => void handleCreate()}
-            hiddenOnMobile={mobilePane === "list"}
-            highlightTargetIndex={
-              highlightTarget && highlightTarget.noteId === activeDraft?.id
-                ? highlightTarget.index
-                : null
-            }
-            onHighlightTargetHandled={() => setHighlightTarget(null)}
-          />
+              onSave={flushCurrentDraft}
+              onTogglePin={handleTogglePin}
+              onToggleArchive={handleToggleArchive}
+              onDelete={() => void handleDelete()}
+              onRestore={() => void handleRestore()}
+              onDeleteForever={() => void handleDeleteForever()}
+              onBack={() => {
+                flushCurrentDraft();
+                setMobilePane("list");
+              }}
+              onCreate={() => void handleCreate()}
+              hiddenOnMobile={mobilePane === "list"}
+            />
         </div>
       </div>
-
-      {highlightsOpen ? (
-        <AllHighlightsDialog
-          notes={workspace.notes ?? []}
-          onClose={() => setHighlightsOpen(false)}
-          onPick={handleOpenHighlight}
-        />
-      ) : null}
     </main>
   );
 }
@@ -1766,6 +1714,7 @@ export function TetherApp() {
           email={null}
           adapter={null}
           client={null}
+          onSignIn={boot.client ? () => setForceLocalMode(false) : undefined}
           bootWarning={boot.error}
         />
       );

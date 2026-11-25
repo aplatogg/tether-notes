@@ -166,4 +166,24 @@ describe("sanitizeHtml hardening", () => {
     expect(sanitizeHtml('<img src="data:text/html;base64,AA" alt="x">')).not.toContain("data:text");
     expect(sanitizeHtml('<img src="file:///etc/passwd" alt="x">')).not.toContain("file:");
   });
+
+  it("blocks external tracking pixel img src (Exploit 4: blind SSRF / IP leak)", () => {
+    const clean = sanitizeHtml(
+      '<p><img src="https://evil.example/pixel.png" alt="track"><img src="http://169.254.169.254/latest/meta-data" alt="ssrf"></p>',
+    );
+
+    expect(clean).not.toContain("evil.example");
+    expect(clean).not.toContain("169.254.169.254");
+    expect(clean).not.toContain("src=");
+  });
+
+  it("blocks protocol-relative URLs //evil.com in href and src (Exploit 7: phishing / tab hijack)", () => {
+    const clean = sanitizeHtml(
+      '<p><a href="//evil.example/login">Sign in</a><a href="\\\\evil.example/login">Backslash</a><img src="//evil.example/p.png"></p>',
+    );
+
+    expect(clean).not.toContain("href=");
+    expect(clean).not.toContain("src=");
+    expect(clean).not.toContain("evil.example");
+  });
 });

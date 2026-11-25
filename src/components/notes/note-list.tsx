@@ -7,7 +7,6 @@ import {
   CalendarDays,
   FileText,
   Folder,
-  Highlighter,
   Lock,
   Pin,
   UsersRound,
@@ -44,8 +43,6 @@ interface NoteListProps {
   onSelectDay: (day: string | null) => void;
   onCreate: () => void;
   hiddenOnMobile: boolean;
-  highlightsOnly: boolean;
-  onToggleHighlightsOnly: () => void;
 }
 
 function formatUpdatedAt(value: string): string {
@@ -93,7 +90,6 @@ function hasActiveFilters(
   selectedFolder: string | null,
   selectedShareGroup: string | null,
   selectedWorkspace: string | "personal" | null,
-  highlightsOnly: boolean,
   calendarDay: string | null,
 ): boolean {
   return Boolean(
@@ -102,7 +98,6 @@ function hasActiveFilters(
       selectedFolder ||
       selectedShareGroup ||
       selectedWorkspace ||
-      highlightsOnly ||
       calendarDay,
   );
 }
@@ -132,8 +127,6 @@ export function NoteList({
   onSelectDay,
   onCreate,
   hiddenOnMobile,
-  highlightsOnly,
-  onToggleHighlightsOnly,
 }: NoteListProps) {
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [pickerValue, setPickerValue] = useState("");
@@ -174,16 +167,6 @@ export function NoteList({
         </div>
         <div className="pane-heading-actions">
           <button
-            className={highlightsOnly ? "icon-button is-active" : "icon-button"}
-            type="button"
-            onClick={onToggleHighlightsOnly}
-            aria-label="Show only notes with highlights"
-            aria-pressed={highlightsOnly}
-            title="Has highlights"
-          >
-            <Highlighter aria-hidden="true" />
-          </button>
-          <button
             className={showCalendar ? "icon-button is-active" : "icon-button"}
             type="button"
             onClick={onToggleCalendar}
@@ -203,12 +186,6 @@ export function NoteList({
         <CalendarView notes={calendarNotes} selectedDay={calendarDay} onSelectDay={onSelectDay} />
       ) : null}
 
-      {highlightsOnly ? (
-        <div className="active-filter">
-          <span>Has highlights</span>
-          <button type="button" onClick={onToggleHighlightsOnly}>Clear</button>
-        </div>
-      ) : null}
       {selectedTag ? (
         <div className="active-filter">
           <span>Tag: {selectedTag}</span>
@@ -385,7 +362,6 @@ export function NoteList({
                 selectedFolder,
                 selectedShareGroup,
                 selectedWorkspace,
-                highlightsOnly,
                 calendarDay,
               )
                 ? "No notes match the current filters. Clear a filter (the chips above the list) to see more."

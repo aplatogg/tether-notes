@@ -37,7 +37,10 @@ export function proxy(request: NextRequest) {
     `script-src ${scriptSrc}`,
     // Inline styles remain: Next and the editor emit style attributes.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    // Attachment previews and voice notes load from private Supabase Storage
+    // signed URLs; arbitrary third-party tracking pixel hosts remain blocked.
+    "img-src 'self' data: blob: https://*.supabase.co",
+    "media-src 'self' data: blob: https://*.supabase.co",
     "font-src 'self' data:",
     // BYOK AI summary posts to the user's own OpenAI-compatible endpoint, so any
     // https origin must be allowed. Documented as a tradeoff in README.

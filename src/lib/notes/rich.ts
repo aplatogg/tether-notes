@@ -87,15 +87,38 @@ export function markdownToHtml(body: string): string {
   return html.join("") || "<p></p>";
 }
 
-/** Schemes a note may link to. Relative URLs are allowed separately. */
-const SAFE_URL_SCHEME = /^(?:https?:|mailto:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i;
+/**
+ * Schemes a note may link to (`<a href>`). Relative in-app paths are allowed
+ * separately, but protocol-relative URLs (`//evil.com` or `\\evil.com`) are
+ * always rejected so an external link cannot masquerade as an in-app route.
+ */
+const SAFE_HREF_SCHEME = /^(?:https?:|mailto:)/i;
+/**
+ * Schemes a note image (`<img src>`) may load. Arbitrary third-party `http(s):`
+ * origins are blocked to prevent blind SSRF / tracking pixels / IP leaks in
+ * shared notes; only inline base64 data URLs and in-app relative paths survive.
+ */
+const SAFE_IMG_SRC_SCHEME = /^data:image\/(?:png|jpe?g|gif|webp);base64,/i;
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const PROTOCOL_RELATIVE = /^[/\\]{2}/;
 
-function isSafeUrl(value: string): boolean {
-  const trimmed = value.trim();
-  if (SAFE_URL_SCHEME.test(trimmed)) return true;
-  // Anything without a scheme is a relative reference and stays in-app.
+function isSafeRelativeUrl(trimmed: string): boolean {
+  if (!trimmed) return false;
+  if (PROTOCOL_RELATIVE.test(trimmed)) return false;
   return !HAS_SCHEME.test(trimmed);
+}
+
+function isSafeHref(value: string): boolean {
+  const trimmed = value.trim();
+  if (PROTOCOL_RELATIVE.test(trimmed)) return false;
+  if (SAFE_HREF_SCHEME.test(trimmed)) return true;
+  return isSafeRelativeUrl(trimmed);
+}
+
+function isSafeImgSrc(value: string): boolean {
+  const trimmed = value.trim();
+  if (SAFE_IMG_SRC_SCHEME.test(trimmed)) return true;
+  return isSafeRelativeUrl(trimmed);
 }
 
 function closestTaskItem(element: Element): Element | null {
@@ -128,8 +151,10 @@ function ensurePurify(): typeof DOMPurify | null {
     DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
       // DOMPurify's global ALLOWED_URI_REGEXP also vets unrelated attributes, which
       // dropped start="3" and type="checkbox". Scheme checks live here instead.
-      if (data.attrName === "href" || data.attrName === "src") {
-        if (!isSafeUrl(data.attrValue)) data.keepAttr = false;
+      if (data.attrName === "href") {
+        if (!isSafeHref(data.attrValue)) data.keepAttr = false;
+      } else if (data.attrName === "src") {
+        if (!isSafeImgSrc(data.attrValue)) data.keepAttr = false;
       }
     });
 
@@ -175,8 +200,9 @@ function ensurePurify(): typeof DOMPurify | null {
 
       if (element.tagName === "A") {
         element.setAttribute("rel", "noopener noreferrer nofollow ugc");
+        const href = (element.getAttribute("href") ?? "").trim();
         // Relative links stay in-app; external ones open in a new tab safely.
-        if (/^https?:\/\//i.test(element.getAttribute("href") ?? "")) {
+        if (/^(?:https?:|mailto:)/i.test(href)) {
           element.setAttribute("target", "_blank");
         } else {
           element.removeAttribute("target");

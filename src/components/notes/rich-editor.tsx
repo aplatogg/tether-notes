@@ -13,7 +13,6 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import {
   SafeHighlight,
-  collectDocHighlights,
   getLastHighlightColor,
   setLastHighlightColor,
   HIGHLIGHT_COLORS,
@@ -158,9 +157,6 @@ interface RichEditorProps {
   readOnly?: boolean;
   onChange: (html: string) => void;
   onSaveShortcut?: () => void;
-  /** Zero-based highlight to select once the editor is ready (global view jump). */
-  highlightTargetIndex?: number | null;
-  onHighlightTargetHandled?: () => void;
 }
 
 interface ToolButtonProps {
@@ -289,21 +285,35 @@ function Toolbar({
     };
   }, [editor]);
 
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   function promptLink() {
     const previous = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("Link URL", previous ?? "https://");
     if (url === null) return;
-    if (url.trim() === "") {
+    const trimmed = url.trim();
+    if (trimmed === "") {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
+    if (/^[/\\]{2}/.test(trimmed)) return;
+    editor.chain().focus().extendMarkRange("link").setLink({ href: trimmed }).run();
   }
 
-  function promptImage() {
-    const url = window.prompt("Image URL", "https://");
-    if (!url?.trim()) return;
-    editor.chain().focus().setImage({ src: url.trim() }).run();
+  function handleImageFile(file: File | undefined) {
+    if (!file || !/^image\/(?:png|jpe?g|gif|webp)$/i.test(file.type)) return;
+    // Keep inline base64 images bounded (2 MB) so note rows remain fast to sync.
+    if (file.size > 2 * 1024 * 1024) {
+      window.alert("Inline image must be under 2 MB. Use the Attachments panel for larger files.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        editor.chain().focus().setImage({ src: reader.result, alt: file.name }).run();
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -375,9 +385,20 @@ function Toolbar({
       <ToolButton label="Link" active={editor.isActive("link")} onClick={promptLink}>
         <Link2 aria-hidden="true" />
       </ToolButton>
-      <ToolButton label="Image" onClick={promptImage}>
+      <ToolButton label="Image" onClick={() => imageInputRef.current?.click()}>
         <ImagePlus aria-hidden="true" />
       </ToolButton>
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        className="sr-only"
+        aria-label="Insert image"
+        onChange={(event) => {
+          handleImageFile(event.target.files?.[0]);
+          event.currentTarget.value = "";
+        }}
+      />
       <ToolButton
         label="Table"
         active={editor.isActive("table")}
@@ -411,8 +432,6 @@ export function RichEditor({
   readOnly = false,
   onChange,
   onSaveShortcut,
-  highlightTargetIndex = null,
-  onHighlightTargetHandled,
 }: RichEditorProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const editor = useEditor({
@@ -472,14 +491,6 @@ export function RichEditor({
       editor.commands.setContent(incoming, { emitUpdate: false });
     }
   }, [editor, value]);
-  useEffect(() => {
-    if (!editor || highlightTargetIndex === null) return;
-    const item = collectDocHighlights(editor.state.doc)[highlightTargetIndex];
-    if (item) {
-      editor.chain().focus().setTextSelection({ from: item.from, to: item.to }).scrollIntoView().run();
-    }
-    onHighlightTargetHandled?.();
-  }, [editor, highlightTargetIndex, onHighlightTargetHandled]);
 
   if (!editor) {
     return <div className="rich-editor-skeleton" aria-hidden="true" />;

@@ -16,12 +16,12 @@ export const noteSchema = z
   .object({
     id: z.string().min(1),
     userId: userIdSchema,
-    title: z.string(),
-    body: z.string(),
-    tags: z.array(z.string()),
+    title: z.string().max(500),
+    body: z.string().max(500_000),
+    tags: z.array(z.string().max(50)).max(20),
     isPinned: z.boolean(),
     isArchived: z.boolean(),
-    lockHash: z.string().nullable().optional(),
+    lockHash: z.string().max(256).nullable().optional(),
     deletedAt: timestampSchema.nullable(),
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
@@ -30,9 +30,9 @@ export const noteSchema = z
     shared: z.boolean().optional(),
     sharedFor: z.string().nullable().optional(),
     ownerEmail: z.string().nullable().optional(),
-    shareGroup: z.string().nullable().optional(),
+    shareGroup: z.string().max(60).nullable().optional(),
     reminderAt: timestampSchema.nullable().optional(),
-    folder: z.string().optional(),
+    folder: z.string().max(60).optional(),
     workspaceId: z.uuid().nullable().optional(),
   })
   .strict();
