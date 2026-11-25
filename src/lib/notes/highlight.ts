@@ -108,21 +108,47 @@ function textFromMarkup(inner: string): string {
 }
 
 /**
- * Extracts highlights from stored note HTML (sanitized first). Used by the
- * global "All highlights" view, so it must not depend on a live editor.
+ * Extracts highlights from stored note HTML, merging adjacent `<mark>` runs
+ * of the same color so indexes match ProseMirror's `collectDocHighlights`.
+ * Used by the global "All highlights" view, so it must not depend on a live editor.
  */
 export function extractHighlights(html: string): NoteHighlight[] {
   const highlights: NoteHighlight[] = [];
+  let lastEnd = -1;
 
   for (const match of html.matchAll(MARK_PATTERN)) {
-    const color = COLOR_ATTR.exec(match[1] ?? "");
-    const text = textFromMarkup(match[2] ?? "");
-    if (!text) continue;
+    const color = normalizeHighlightColor(COLOR_ATTR.exec(match[1] ?? "")?.[1]);
+    const rawInner = match[2] ?? "";
+    const text = textFromMarkup(rawInner);
+    const matchStart = match.index ?? 0;
+    const matchEnd = matchStart + match[0].length;
+    if (!text) {
+      lastEnd = matchEnd;
+      continue;
+    }
+
+    const previous = highlights[highlights.length - 1];
+    const between = lastEnd >= 0 ? html.slice(lastEnd, matchStart) : null;
+    // Adjacent marks separated only by inline tags (e.g. </strong><strong>)
+    // represent one contiguous highlight in ProseMirror.
+    if (
+      previous &&
+      previous.color === color &&
+      between !== null &&
+      /^(?:<\/?(?:strong|b|em|i|u|s|del|code|a|span)\b[^>]*>)*$/i.test(between)
+    ) {
+      const joiner = /^\s/.test(rawInner.replace(/<[^>]+>/g, "")) ? " " : " ";
+      previous.text = `${previous.text}${joiner}${text}`.replace(/\s+/g, " ").trim();
+      lastEnd = matchEnd;
+      continue;
+    }
+
     highlights.push({
       index: highlights.length,
       text,
-      color: normalizeHighlightColor(color?.[1]),
+      color,
     });
+    lastEnd = matchEnd;
   }
 
   return highlights;

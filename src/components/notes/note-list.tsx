@@ -93,9 +93,17 @@ function hasActiveFilters(
   selectedFolder: string | null,
   selectedShareGroup: string | null,
   selectedWorkspace: string | "personal" | null,
+  highlightsOnly: boolean,
+  calendarDay: string | null,
 ): boolean {
   return Boolean(
-    query.trim() || selectedTag || selectedFolder || selectedShareGroup || selectedWorkspace,
+    query.trim() ||
+      selectedTag ||
+      selectedFolder ||
+      selectedShareGroup ||
+      selectedWorkspace ||
+      highlightsOnly ||
+      calendarDay,
   );
 }
 
@@ -166,17 +174,17 @@ export function NoteList({
         </div>
         <div className="pane-heading-actions">
           <button
-            className={highlightsOnly ? "mobile-new-button is-active" : "mobile-new-button"}
+            className={highlightsOnly ? "icon-button is-active" : "icon-button"}
             type="button"
             onClick={onToggleHighlightsOnly}
             aria-label="Show only notes with highlights"
             aria-pressed={highlightsOnly}
-            title="Ada sorotan"
+            title="Has highlights"
           >
             <Highlighter aria-hidden="true" />
           </button>
           <button
-            className={showCalendar ? "mobile-new-button is-active" : "mobile-new-button"}
+            className={showCalendar ? "icon-button is-active" : "icon-button"}
             type="button"
             onClick={onToggleCalendar}
             aria-label="Toggle calendar"
@@ -197,7 +205,7 @@ export function NoteList({
 
       {highlightsOnly ? (
         <div className="active-filter">
-          <span>Ada sorotan</span>
+          <span>Has highlights</span>
           <button type="button" onClick={onToggleHighlightsOnly}>Clear</button>
         </div>
       ) : null}
@@ -371,7 +379,15 @@ export function NoteList({
           <div className="list-empty-state">
             <FileText aria-hidden="true" />
             <p>
-              {hasActiveFilters(query, selectedTag, selectedFolder, selectedShareGroup, selectedWorkspace)
+              {hasActiveFilters(
+                query,
+                selectedTag,
+                selectedFolder,
+                selectedShareGroup,
+                selectedWorkspace,
+                highlightsOnly,
+                calendarDay,
+              )
                 ? "No notes match the current filters. Clear a filter (the chips above the list) to see more."
                 : emptyMessage(scope, query, selectedTag)}
             </p>

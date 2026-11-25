@@ -7,9 +7,10 @@ import { ArrowRight, LoaderCircle } from "lucide-react";
 interface AuthPanelProps {
   client: SupabaseClient;
   initialError?: string | null;
+  onContinueLocal?: () => void;
 }
 
-export function AuthPanel({ client, initialError = null }: AuthPanelProps) {
+export function AuthPanel({ client, initialError = null, onContinueLocal }: AuthPanelProps) {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -137,6 +138,15 @@ export function AuthPanel({ client, initialError = null }: AuthPanelProps) {
             )}
             {mode === "sign-in" ? "Sign in" : "Create account"}
           </button>
+          {onContinueLocal ? (
+            <button
+              className="secondary-button auth-local"
+              type="button"
+              onClick={onContinueLocal}
+            >
+              Continue locally without an account
+            </button>
+          ) : null}
         </form>
         <p className="auth-foot">
           <a href="/privacy">Privacy</a>

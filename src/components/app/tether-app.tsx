@@ -964,6 +964,7 @@ async function handleDeleteForever() {
           <kbd>⌘ N</kbd>
         </button>
 
+        <div className="sidebar-scroll">
         {client && userId && invites.length > 0 ? (
           <div className="sidebar-tags">
             <p><Bell aria-hidden="true" /> Invitations</p>
@@ -1159,17 +1160,17 @@ async function handleDeleteForever() {
         </nav>
 
         <div className="sidebar-tags">
-          <p><Highlighter aria-hidden="true" /> Sorotan</p>
+          <p><Highlighter aria-hidden="true" /> Highlights</p>
           <button
             className={highlightsOnly ? "is-active" : undefined}
             type="button"
             onClick={() => setHighlightsOnly((value) => !value)}
           >
-            <span>Ada sorotan</span>
+            <span>Has highlights</span>
             <span className="num">{highlightedNotes.length}</span>
           </button>
           <button type="button" onClick={() => setHighlightsOpen(true)}>
-            <span>Semua sorotan</span>
+            <span>All highlights</span>
             <span className="num">{highlightedNotes.length}</span>
           </button>
         </div>
@@ -1265,6 +1266,7 @@ async function handleDeleteForever() {
             ))}
           </div>
         ) : null}
+        </div>
 
 
         <div className="sidebar-foot">
@@ -1469,30 +1471,26 @@ async function handleDeleteForever() {
               <div className="account-menu">
                 <span>{userId ? "Signed in" : "Local-only mode"}</span>
                 <strong>{email ?? "No account required"}</strong>
-                {userId ? (
-                  <>
-                    <button type="button" onClick={handleExport}>
-                      <Download aria-hidden="true" /> Export all notes (.json)
-                    </button>
-                    <button type="button" onClick={() => importInputRef.current?.click()}>
-                      <Upload aria-hidden="true" /> Import notes (.json)
-                    </button>
-                    <input
-                      ref={importInputRef}
-                      type="file"
-                      accept="application/json,.json"
-                      className="sr-only"
-                      aria-label="Import notes file"
-                      onChange={(event) => void handleImportFile(event.target.files?.[0])}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void ensureNotificationPermission()}
-                    >
-                      <Bell aria-hidden="true" /> Enable reminder notifications
-                    </button>
-                  </>
-                ) : null}
+                <button type="button" onClick={handleExport}>
+                  <Download aria-hidden="true" /> Export all notes (.json)
+                </button>
+                <button type="button" onClick={() => importInputRef.current?.click()}>
+                  <Upload aria-hidden="true" /> Import notes (.json)
+                </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  aria-label="Import notes file"
+                  onChange={(event) => void handleImportFile(event.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => void ensureNotificationPermission()}
+                >
+                  <Bell aria-hidden="true" /> Enable reminder notifications
+                </button>
                 {importError ? <p className="form-error" role="alert">{importError}</p> : null}
                 {onSignOut ? (
                   <button type="button" onClick={() => void handleSignOut()} disabled={isSigningOut}>
@@ -1500,7 +1498,7 @@ async function handleDeleteForever() {
                     {isSigningOut ? "Signing out…" : "Sign out"}
                   </button>
                 ) : (
-                  <p>Add public Supabase environment values to enable account sync.</p>
+                  <p>Notes are stored locally in this browser (IndexedDB).</p>
                 )}
               </div>
             ) : null}
@@ -1714,7 +1712,13 @@ function CloudWorkspace({
   }
 
   if (!session) {
-    return <AuthPanel client={client} initialError={authError} />;
+    return (
+      <AuthPanel
+        client={client}
+        initialError={authError}
+        onContinueLocal={continueOffline}
+      />
+    );
   }
 
   return (

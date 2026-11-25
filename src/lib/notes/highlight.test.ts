@@ -30,6 +30,15 @@ describe("highlight helpers", () => {
     expect(extractHighlights('<p><mark data-color="blue"> </mark></p>')).toEqual([]);
   });
 
+  it("merges adjacent HTML marks split by inline formatting of the same color", () => {
+    const html =
+      '<p><mark data-color="blue">one </mark><strong><mark data-color="blue">two</mark></strong></p>';
+
+    expect(extractHighlights(html)).toEqual([
+      { index: 0, text: "one two", color: "blue" },
+    ]);
+  });
+
   it("merges adjacent text nodes that share a highlight", () => {
     const nodes = [
       { isText: true, text: "one ", nodeSize: 4, marks: [{ type: { name: "highlight" }, attrs: { color: "blue" } }] },

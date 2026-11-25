@@ -195,8 +195,18 @@ button:disabled {
   font-weight: 500;
 }
 
+.sidebar-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 12px;
+  padding-bottom: 12px;
+  overflow-y: auto;
+}
+
 .sidebar-nav {
-  margin-top: 30px;
+  margin-top: 14px;
 }
 
 .sidebar-nav > p,
@@ -252,9 +262,7 @@ button:disabled {
 }
 
 .sidebar-tags {
-  min-height: 0;
-  margin-top: 28px;
-  overflow-y: auto;
+  margin-top: 20px;
 }
 
 .sidebar-tags > button {
@@ -1260,6 +1268,12 @@ button:disabled {
   width: 100%;
   min-height: 40px;
   margin-top: 18px;
+}
+
+.auth-local {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 10px;
 }
 
 .auth-submit svg {

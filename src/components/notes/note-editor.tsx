@@ -5,6 +5,7 @@ import {
   Archive,
   ArchiveRestore,
   ChevronLeft,
+  Download,
   FileText,
   Link2,
   LoaderCircle,
@@ -20,8 +21,9 @@ import {
 } from "lucide-react";
 import { RichEditor } from "@/components/notes/rich-editor";
 import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl, WorkspaceSelect } from "@/components/notes/note-extras";
+import { downloadText, noteToMarkdown } from "@/lib/notes/export";
 import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
-import { normalizeTags } from "@/lib/notes/model";
+import { displayTitle, normalizeTags } from "@/lib/notes/model";
 import { trashDaysLeft } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
 import type { Workspace } from "@/lib/supabase/workspaces";
@@ -104,6 +106,17 @@ export function NoteEditor({
   function commitTags() {
     if (!note) return;
     onChange({ tags: normalizeTags(note.tags) });
+  }
+
+  function exportMarkdown() {
+    if (!note || locked) return;
+    const slug =
+      displayTitle(note)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 60) || "note";
+    downloadText(`${slug}.md`, noteToMarkdown(note), "text/markdown");
   }
 
   async function openPinModal(next: "set" | "unlock" | "remove") {
@@ -267,6 +280,16 @@ export function NoteEditor({
                 title="Attachments & AI summary"
               >
                 <Paperclip aria-hidden="true" />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={exportMarkdown}
+                aria-label="Export note as Markdown"
+                title="Export Markdown (.md)"
+                disabled={locked}
+              >
+                <Download aria-hidden="true" />
               </button>
               {readOnly ? null : (
                 <>

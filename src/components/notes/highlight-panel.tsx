@@ -15,11 +15,11 @@ import { isHtmlBody, markdownToHtml } from "@/lib/notes/rich";
 import type { Note } from "@/lib/notes/types";
 
 const COLOR_LABELS: Record<HighlightColor, string> = {
-  yellow: "Kuning",
-  green: "Hijau",
-  pink: "Merah muda",
-  blue: "Biru",
-  orange: "Oranye",
+  yellow: "Yellow",
+  green: "Green",
+  pink: "Pink",
+  blue: "Blue",
+  orange: "Orange",
 };
 
 function ColorChips({
@@ -30,13 +30,13 @@ function ColorChips({
   onChange: (color: HighlightColor | null) => void;
 }) {
   return (
-    <div className="highlight-filter" role="group" aria-label="Filter warna sorotan">
+    <div className="highlight-filter" role="group" aria-label="Filter by highlight color">
       <button
         type="button"
         className={value === null ? "highlight-chip is-active" : "highlight-chip"}
         onClick={() => onChange(null)}
       >
-        Semua
+        All
       </button>
       {HIGHLIGHT_COLORS.map((color) => (
         <button
@@ -54,7 +54,6 @@ function ColorChips({
     </div>
   );
 }
-
 
 export function NoteHighlightsPanel({
   editor,
@@ -87,19 +86,19 @@ export function NoteHighlightsPanel({
   }
 
   return (
-    <aside className="highlight-panel" aria-label="Sorotan catatan ini">
+    <aside className="highlight-panel" aria-label="Note highlights">
       <header>
         <span>
-          <Highlighter aria-hidden="true" /> Sorotan ({visible.length})
+          <Highlighter aria-hidden="true" /> Highlights ({visible.length})
         </span>
-        <button type="button" onClick={onClose} aria-label="Tutup sorotan">
+        <button type="button" onClick={onClose} aria-label="Close highlights">
           <X aria-hidden="true" />
         </button>
       </header>
       <ColorChips value={color} onChange={setColor} />
       {visible.length === 0 ? (
         <p className="highlight-empty">
-          Belum ada sorotan di catatan ini. Pilih teks lalu tekan Ctrl/Cmd+Shift+H.
+          No highlights in this note yet. Select text and press Ctrl/Cmd+Shift+H.
         </p>
       ) : (
         <ul className="highlight-list">
@@ -162,12 +161,12 @@ export function AllHighlightsDialog({
         className="pin-dialog highlight-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Semua sorotan"
+        aria-label="All highlights"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="highlight-dialog-head">
-          <h2>Semua Sorotan ({total})</h2>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Tutup">
+          <h2>All highlights ({total})</h2>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
             <X aria-hidden="true" />
           </button>
         </header>
@@ -178,15 +177,15 @@ export function AllHighlightsDialog({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari teks sorotan"
-              aria-label="Cari teks sorotan"
+              placeholder="Search highlighted text"
+              aria-label="Search highlighted text"
             />
           </label>
           <ColorChips value={color} onChange={setColor} />
         </div>
         <div className="highlight-dialog-body">
           {groups.length === 0 ? (
-            <p className="highlight-empty">Tidak ada sorotan yang cocok.</p>
+            <p className="highlight-empty">No matching highlights.</p>
           ) : (
             groups.map((group) => (
               <section key={group.note.id} className="highlight-group">

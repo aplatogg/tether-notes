@@ -260,7 +260,7 @@ function HighlightControl({ editor }: { editor: Editor }) {
               setOpen(false);
             }}
           >
-            Hapus sorotan
+            Remove highlight
           </button>
         </div>
       ) : null}
@@ -390,7 +390,7 @@ function Toolbar({
 
       <span className="format-divider" aria-hidden="true" />
 
-      <ToolButton label="Sorotan" active={panelOpen} onClick={onTogglePanel}>
+      <ToolButton label="Highlights" active={panelOpen} onClick={onTogglePanel}>
         <PanelRight aria-hidden="true" />
       </ToolButton>
 
