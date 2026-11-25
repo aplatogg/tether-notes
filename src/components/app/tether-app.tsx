@@ -22,6 +22,7 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  MoreHorizontal,
   Pencil,
   Pin,
   Plus,
@@ -185,6 +186,21 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, bootWarning
   const [confirmDeleteWs, setConfirmDeleteWs] = useState(false);
   const [confirmDeleteRow, setConfirmDeleteRow] = useState<string | null>(null);
   const [editingWs, setEditingWs] = useState<{ id: string; name: string } | null>(null);
+  const [wsMenuId, setWsMenuId] = useState<string | null>(null);
+
+  // A dropdown opened from the workspace row must close on any outside click;
+  // per-button handlers alone would leave it stuck open.
+  useEffect(() => {
+    if (wsMenuId === null) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".workspace-menu-wrap")) return;
+      setWsMenuId(null);
+      setConfirmDeleteRow(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [wsMenuId]);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -1024,50 +1040,74 @@ async function handleDeleteForever() {
                   </button>
                 )}
                 {editingWs?.id === ws.id ? null : (
-                <button
-                  type="button"
-                  className="workspace-manage"
-                  aria-label={`Members of ${ws.name}`}
-                  title="Members"
-                  onClick={() => void openMembersDialog(ws)}
-                >
-                  <UsersRound aria-hidden="true" />
-                </button>
-                )}
-                {ws.role === "owner" && editingWs?.id !== ws.id ? (
-                  <button
-                    type="button"
-                    className="workspace-manage"
-                    aria-label={`Rename ${ws.name}`}
-                    title="Rename workspace"
-                    onClick={() => setEditingWs({ id: ws.id, name: ws.name })}
-                  >
-                    <Pencil aria-hidden="true" />
-                  </button>
-                ) : null}
-                {ws.role === "owner" ? (
-                  confirmDeleteRow === ws.id ? (
-                    <button
-                      type="button"
-                      className="workspace-manage workspace-delete-confirm"
-                      aria-label={`Confirm delete ${ws.name}`}
-                      title="Confirm delete"
-                      onClick={() => void handleDeleteWorkspaceById(ws.id)}
-                    >
-                      <Check aria-hidden="true" />
-                    </button>
-                  ) : (
+                  <div className="workspace-menu-wrap">
                     <button
                       type="button"
                       className="workspace-manage"
-                      aria-label={`Delete ${ws.name}`}
-                      title="Delete workspace"
-                      onClick={() => setConfirmDeleteRow(ws.id)}
+                      aria-label={`Actions for ${ws.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={wsMenuId === ws.id}
+                      title="More"
+                      onClick={() => {
+                        setConfirmDeleteRow(null);
+                        setWsMenuId((current) => (current === ws.id ? null : ws.id));
+                      }}
                     >
-                      <X aria-hidden="true" />
+                      <MoreHorizontal aria-hidden="true" />
                     </button>
-                  )
-                ) : null}
+                    {wsMenuId === ws.id ? (
+                      <div className="workspace-menu" role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setWsMenuId(null);
+                            void openMembersDialog(ws);
+                          }}
+                        >
+                          <UsersRound aria-hidden="true" /> Members
+                        </button>
+                        {ws.role === "owner" ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setWsMenuId(null);
+                              setEditingWs({ id: ws.id, name: ws.name });
+                            }}
+                          >
+                            <Pencil aria-hidden="true" /> Rename
+                          </button>
+                        ) : null}
+                        {ws.role === "owner" ? (
+                          confirmDeleteRow === ws.id ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="is-danger"
+                              onClick={() => {
+                                setWsMenuId(null);
+                                setConfirmDeleteRow(null);
+                                void handleDeleteWorkspaceById(ws.id);
+                              }}
+                            >
+                              <Check aria-hidden="true" /> Confirm delete
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="is-danger"
+                              onClick={() => setConfirmDeleteRow(ws.id)}
+                            >
+                              <Trash2 aria-hidden="true" /> Delete workspace
+                            </button>
+                          )
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1226,15 +1266,18 @@ async function handleDeleteForever() {
               <ul className="grant-list">
                 {members.map((member) => (
                   <li key={member.userId}>
-                    <span>{member.email} · {member.role}</span>
+                    <span className="grant-who">
+                      <span className="grant-email">{member.email}</span>
+                      <span className="grant-role">{member.role}</span>
+                    </span>
                     {membersDialog.role === "owner" && member.role !== "owner" ? (
                       <button
                         type="button"
-                        className="danger-link"
+                        className="grant-remove"
                         disabled={membersBusy}
                         onClick={() => void handleRemoveMember(member)}
                       >
-                        <X aria-hidden="true" /> Remove
+                        Remove
                       </button>
                     ) : null}
                   </li>
