@@ -37,6 +37,7 @@ import {
 
 interface NoteEditorProps {
   note: Note | null;
+  currentUserId: string | null;
   isDirty: boolean;
   isLocalOnly: boolean;
   folders: string[];
@@ -64,6 +65,7 @@ function noteStateLabel(note: Note, isDirty: boolean, isLocalOnly: boolean): str
 
 export function NoteEditor({
   note,
+  currentUserId,
   isDirty,
   isLocalOnly,
   folders,
@@ -416,7 +418,7 @@ export function NoteEditor({
                 />
                 {extrasOpen ? (
                   <div className="editor-extras">
-                    <AttachmentsPanel note={note} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
+                    <AttachmentsPanel note={note} currentUserId={currentUserId} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
                     <AiSummaryPanel note={note} readOnly={readOnly} />
                   </div>
                 ) : null}

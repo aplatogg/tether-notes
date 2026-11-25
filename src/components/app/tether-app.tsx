@@ -1409,6 +1409,7 @@ async function handleDeleteForever() {
             />
             <NoteEditor
               note={activeDraft}
+              currentUserId={userId}
               isDirty={isDirty}
               isLocalOnly={workspace.syncState.phase === "local-only"}
               folders={folders}

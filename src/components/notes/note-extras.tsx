@@ -159,10 +159,12 @@ export function WorkspaceSelect({
 
 export function AttachmentsPanel({
   note,
+  currentUserId,
   client,
   readOnly,
 }: {
   note: Note;
+  currentUserId: string | null;
   client: SupabaseClient | null;
   readOnly: boolean;
 }) {
@@ -219,12 +221,12 @@ export function AttachmentsPanel({
   }, [client, attachments]);
 
   async function handleFiles(files: FileList | null) {
-    if (!client || !note.userId || !files?.length) return;
+    if (!client || !currentUserId || !files?.length) return;
     setBusy(true);
     setError(null);
     try {
       for (const file of Array.from(files)) {
-        const uploaded = await uploadAttachment(client, note.id, note.userId, file, file.name);
+        const uploaded = await uploadAttachment(client, note.id, currentUserId, file, file.name);
         setAttachments((current) => [...current, uploaded]);
       }
     } catch (cause) {
@@ -236,7 +238,7 @@ export function AttachmentsPanel({
   }
 
   async function toggleRecording() {
-    if (!client || !note.userId) return;
+    if (!client || !currentUserId) return;
     if (recording) {
       recorderRef.current?.stop();
       return;
@@ -261,7 +263,7 @@ export function AttachmentsPanel({
             const uploaded = await uploadAttachment(
               client,
               note.id,
-              note.userId!,
+              currentUserId,
               blob,
               `voice-${new Date().toISOString().replace(/[:.]/gu, "-")}.${extension}`,
             );

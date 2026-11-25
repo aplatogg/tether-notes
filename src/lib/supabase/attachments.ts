@@ -54,14 +54,36 @@ export async function listAttachments(
 }
 
 function sanitizeFileName(name: string): string {
-  return name.replace(/[^\w.()\- ]+/gu, "_").slice(0, 120) || "file";
+  const cleaned = name
+    .replace(/[^\w.()\- ]+/gu, "_")
+    .replace(/\.{2,}/gu, "_")
+    .replace(/^\.+/u, "")
+    .slice(0, 120);
+  return cleaned || "file";
+}
+
+/**
+ * Attaching writes carry a note_attachments INSERT, whose policy requires the
+ * note to be yours or in a workspace you belong to. Checking with this SELECT
+ * (RLS applies the same rule) means a rejected attach never leaves an orphan
+ * object in the bucket, and every failure is one uniform, non-probing message.
+ */
+async function assertCanAttach(client: SupabaseClient, noteId: string): Promise<void> {
+  const { data, error } = await client
+    .from("notes")
+    .select("id")
+    .eq("id", noteId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("You cannot attach files to this note.");
 }
 
 /** Uploads a file into the private bucket and registers its metadata row. */
 export async function uploadAttachment(
   client: SupabaseClient,
   noteId: string,
-  userId: string,
+  uploaderId: string,
   file: Blob,
   fileName: string,
 ): Promise<NoteAttachment> {
@@ -71,7 +93,13 @@ export async function uploadAttachment(
     );
   }
 
-  const path = `${userId}/${noteId}/${globalThis.crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
+  await assertCanAttach(client, noteId);
+
+  // The bucket policy scopes objects to the uploader's folder, so the path uses
+  // the caller (not the note owner): a workspace member attaching to someone
+  // else's note must upload under their own uid.
+  const safeName = sanitizeFileName(fileName);
+  const path = `${uploaderId}/${noteId}/${globalThis.crypto.randomUUID()}-${safeName}`;
 
   const { error: uploadError } = await client.storage
     .from(BUCKET)
@@ -83,9 +111,9 @@ export async function uploadAttachment(
     .from("note_attachments")
     .insert({
       note_id: noteId,
-      user_id: userId,
+      user_id: uploaderId,
       path,
-      name: sanitizeFileName(fileName),
+      name: safeName,
       mime: file.type || "application/octet-stream",
       size_bytes: file.size,
     })
@@ -93,8 +121,11 @@ export async function uploadAttachment(
     .single();
 
   if (error) {
-    await client.storage.from(BUCKET).remove([path]);
-    throw new Error(error.message);
+    // Best-effort rollback; surface a failed cleanup instead of hiding it so an
+    // orphan object is visible to whoever reads the error.
+    const { error: cleanupError } = await client.storage.from(BUCKET).remove([path]);
+    const suffix = cleanupError ? ` (orphan cleanup failed: ${cleanupError.message})` : "";
+    throw new Error(`${error.message}${suffix}`);
   }
 
   return toAttachment(data);
