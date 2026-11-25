@@ -509,17 +509,49 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
     void persistDraft(activeDraft, draftRevision.current);
   }
 
+  const flushOnUnload = useEffectEvent(() => {
+    flushCurrentDraft();
+  });
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushOnUnload();
+    };
+    window.addEventListener("pagehide", flushOnUnload);
+    window.addEventListener("beforeunload", flushOnUnload);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flushOnUnload);
+      window.removeEventListener("beforeunload", flushOnUnload);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   async function handleCreate() {
     flushCurrentDraft();
 
     try {
       let note = await workspace.createNote();
-      // New notes land in the default "General" group and the selected workspace (if any).
+      // Inherit the active group/tag/workspace/pinned context so the new note
+      // stays visible in the current list rather than vanishing behind a filter.
       const changes: Partial<Note> = {};
-      if (!note.folder?.trim()) changes.folder = DEFAULT_GROUP;
+      changes.folder = selectedFolder || note.folder?.trim() || DEFAULT_GROUP;
       if (selectedWorkspace && selectedWorkspace !== "personal") {
         changes.workspaceId = selectedWorkspace;
       }
+      if (selectedTag) {
+        changes.tags = normalizeTags([...note.tags, selectedTag]);
+      }
+      if (scope === "pinned") {
+        changes.isPinned = true;
+      }
+      if (scope === "trash" || scope === "archived" || scope === "shared") {
+        setScope("all");
+        setSelectedShareGroup(null);
+      }
+      if (query) setQuery("");
+      if (calendarDay) setCalendarDay(null);
+
       if (Object.keys(changes).length > 0) {
         note = await workspace.saveNote({ ...note, ...changes });
       }
@@ -976,7 +1008,13 @@ async function handleDeleteForever() {
     // it here to make refresh work in the desktop app too.
     if (command && event.key.toLowerCase() === "r") {
       event.preventDefault();
-      window.location.reload();
+      if (activeDraft && isDirty) {
+        void persistDraft(activeDraft, draftRevision.current).finally(() => {
+          window.location.reload();
+        });
+      } else {
+        window.location.reload();
+      }
       return;
     }
 

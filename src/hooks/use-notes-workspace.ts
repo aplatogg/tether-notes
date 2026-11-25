@@ -214,6 +214,7 @@ export function useNotesWorkspace(
     const saved = await withRepository((activeRepository) =>
       activeRepository.localUpsert(draft),
     );
+    applyLocalPatch(saved);
     void engineRef.current?.sync();
     return saved;
   }
@@ -286,6 +287,7 @@ async function deleteForever(noteId: string): Promise<void> {
       try {
         if (adapter?.purge) await adapter.purge(note.id);
         await repository.hardDelete(note.id);
+        applyLocalRemove(note.id);
         removed += 1;
       } catch {
         // Keep the note when the remote purge fails so nothing is lost silently.

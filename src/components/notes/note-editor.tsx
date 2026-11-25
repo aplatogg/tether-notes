@@ -126,6 +126,18 @@ export function NoteEditor({
     return () => document.removeEventListener("mousedown", close);
   }, [exportOpen]);
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      setShare(null);
+      setShareError(null);
+      setPinMode(null);
+      setPin("");
+      setPinError(null);
+      setGrantsOpen(false);
+      setExportOpen(false);
+    });
+  }, [note?.id]);
+
   const locked = Boolean(note?.lockHash) && !(note ? unlocked[note.id] : false);
   const readOnly = note?.shared === true;
   const activePin = note ? unlockedPins[note.id] : undefined;

@@ -47,32 +47,36 @@ mark[data-color="yellow"],
 .highlight-dot[data-color="yellow"],
 .highlight-current[data-color="yellow"] {
   background: var(--hl-yellow);
+  color: var(--hl-yellow-ink);
 }
 mark[data-color="green"],
 .highlight-dot[data-color="green"],
 .highlight-current[data-color="green"] {
   background: var(--hl-green);
+  color: var(--hl-green-ink);
 }
 mark[data-color="pink"],
 .highlight-dot[data-color="pink"],
 .highlight-current[data-color="pink"] {
   background: var(--hl-pink);
+  color: var(--hl-pink-ink);
 }
 mark[data-color="blue"],
 .highlight-dot[data-color="blue"],
 .highlight-current[data-color="blue"] {
   background: var(--hl-blue);
+  color: var(--hl-blue-ink);
 }
 mark[data-color="orange"],
 .highlight-dot[data-color="orange"],
 .highlight-current[data-color="orange"] {
   background: var(--hl-orange);
+  color: var(--hl-orange-ink);
 }
 
 mark[data-color] {
   padding: 0 0.14em;
   border-radius: 3px;
-  color: inherit;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
