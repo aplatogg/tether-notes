@@ -5,11 +5,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   Bell,
   BellOff,
+  Briefcase,
   FileUp,
+  Folder,
   LoaderCircle,
   Mic,
   Paperclip,
   Sparkles,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -25,6 +28,7 @@ import {
 } from "@/lib/supabase/attachments";
 import { loadAiConfig, saveAiConfig, summarizeText, type AiConfig } from "@/lib/ai/summary";
 import { notePlainText } from "@/lib/notes/export";
+import { normalizeTags } from "@/lib/notes/model";
 import type { Note } from "@/lib/notes/types";
 
 /* ---------- reminder ---------- */
@@ -89,7 +93,7 @@ function toLocalInput(iso: string): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/* ---------- folder ---------- */
+/* ---------- metadata bar pills (workspace, folder/group, tags) ---------- */
 
 export function FolderInput({
   note,
@@ -103,17 +107,44 @@ export function FolderInput({
   onChange: (changes: Partial<Note>) => void;
 }) {
   return (
-    <label className="folder-input">
+    <label className={note.folder ? "meta-pill is-filled" : "meta-pill"} title="Group / folder">
+      <Folder aria-hidden="true" />
       <span className="sr-only">Folder</span>
       <input
         list="note-folders"
         defaultValue={note.folder ?? ""}
-        key={`folder-${note.id}`}
-        placeholder="Group (optional, e.g. General, Kerja/Q4)"
+        key={`folder-${note.id}-${note.folder ?? ""}`}
+        placeholder="Add group…"
         readOnly={readOnly}
         maxLength={60}
-        onBlur={(event) => onChange({ folder: event.target.value.trim() })}
+        onBlur={(event) => {
+          const next = event.target.value.trim();
+          if (next !== (note.folder ?? "")) {
+            onChange({ folder: next });
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onChange({ folder: event.currentTarget.value.trim() });
+            event.currentTarget.blur();
+          }
+        }}
       />
+      {note.folder && !readOnly ? (
+        <button
+          type="button"
+          className="meta-pill-clear"
+          aria-label="Clear group"
+          title="Clear group"
+          onClick={(event) => {
+            event.preventDefault();
+            onChange({ folder: "" });
+          }}
+        >
+          <X aria-hidden="true" />
+        </button>
+      ) : null}
       <datalist id="note-folders">
         {folders.map((folder) => (
           <option key={folder} value={folder} />
@@ -135,12 +166,12 @@ export function WorkspaceSelect({
   onChange: (changes: Partial<Note>) => void;
 }) {
   return (
-    <label className="folder-input">
+    <label className={note.workspaceId ? "meta-pill is-filled" : "meta-pill"} title="Workspace">
+      <Briefcase aria-hidden="true" />
       <span className="sr-only">Workspace</span>
       <select
         aria-label="Workspace"
-        defaultValue={note.workspaceId ?? ""}
-        key={`workspace-${note.id}`}
+        value={note.workspaceId ?? ""}
         disabled={readOnly}
         onChange={(event) => onChange({ workspaceId: event.target.value || null })}
       >
@@ -152,6 +183,89 @@ export function WorkspaceSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+export function TagChipsBar({
+  note,
+  readOnly,
+  onChange,
+}: {
+  note: Note;
+  readOnly: boolean;
+  onChange: (changes: Partial<Note>) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const tags = normalizeTags(note.tags);
+
+  function addDraftTags(raw: string) {
+    const parts = raw
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    const next = normalizeTags([...tags, ...parts]);
+    onChange({ tags: next });
+    setDraft("");
+  }
+
+  function removeTag(target: string) {
+    onChange({ tags: tags.filter((tag) => tag !== target) });
+  }
+
+  return (
+    <div className="meta-tags-group" aria-label="Note tags">
+      {tags.map((tag) => (
+        <span key={tag} className="meta-tag-chip">
+          <span className="meta-tag-hash">#</span>
+          <span>{tag}</span>
+          {!readOnly ? (
+            <button
+              type="button"
+              className="meta-tag-remove"
+              aria-label={`Remove tag ${tag}`}
+              title={`Remove #${tag}`}
+              onClick={() => removeTag(tag)}
+            >
+              <X aria-hidden="true" />
+            </button>
+          ) : null}
+        </span>
+      ))}
+      {!readOnly ? (
+        <label className="meta-pill meta-tag-input-pill" htmlFor="note-tags">
+          <Tag aria-hidden="true" />
+          <span className="sr-only">Add tag</span>
+          <input
+            id="note-tags"
+            value={draft}
+            placeholder={tags.length === 0 ? "Add tags…" : "+ tag"}
+            maxLength={40}
+            autoComplete="off"
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value.includes(",")) {
+                addDraftTags(value);
+              } else {
+                setDraft(value);
+              }
+            }}
+            onBlur={() => {
+              if (draft.trim()) addDraftTags(draft);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (draft.trim()) addDraftTags(draft);
+              } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
+                event.preventDefault();
+                removeTag(tags[tags.length - 1]);
+              }
+            }}
+          />
+        </label>
+      ) : null}
+    </div>
   );
 }
 

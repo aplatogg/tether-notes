@@ -19,12 +19,13 @@ import {
   PinOff,
   Printer,
   Save,
+  Sparkles,
   Trash2,
   UserPlus,
   X,
 } from "lucide-react";
 import { RichEditor } from "@/components/notes/rich-editor";
-import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl, WorkspaceSelect } from "@/components/notes/note-extras";
+import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl, TagChipsBar, WorkspaceSelect } from "@/components/notes/note-extras";
 import { downloadText, exportNotesJson, noteToMarkdown, noteToTxt } from "@/lib/notes/export";
 import {
   createLockSecret,
@@ -32,7 +33,7 @@ import {
   encryptLockedBody,
   isEncryptedBody,
 } from "@/lib/notes/lock";
-import { displayTitle, normalizeTags } from "@/lib/notes/model";
+import { displayTitle } from "@/lib/notes/model";
 import { trashDaysLeft } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
 import type { Workspace } from "@/lib/supabase/workspaces";
@@ -131,11 +132,6 @@ export function NoteEditor({
     note && note.lockHash && isEncryptedBody(note.body)
       ? (decryptedBodies[note.id] ?? "")
       : (note?.body ?? "");
-
-  function commitTags() {
-    if (!note) return;
-    onChange({ tags: normalizeTags(note.tags) });
-  }
 
   function noteSlug(target: Note): string {
     return (
@@ -553,9 +549,41 @@ export function NoteEditor({
                   autoComplete="off"
                   maxLength={500}
                 />
-                <FolderInput note={note} folders={folders} readOnly={readOnly || note.deletedAt !== null} onChange={onChange} />
-                {workspaces.length > 0 ? (
-                  <WorkspaceSelect note={note} workspaces={workspaces} readOnly={readOnly || note.deletedAt !== null} onChange={onChange} />
+                <div className="editor-meta-bar" aria-label="Note metadata">
+                  <WorkspaceSelect
+                    note={note}
+                    workspaces={workspaces}
+                    readOnly={readOnly || note.deletedAt !== null}
+                    onChange={onChange}
+                  />
+                  <FolderInput
+                    note={note}
+                    folders={folders}
+                    readOnly={readOnly || note.deletedAt !== null}
+                    onChange={onChange}
+                  />
+                  <TagChipsBar
+                    note={note}
+                    readOnly={readOnly || note.deletedAt !== null}
+                    onChange={onChange}
+                  />
+                  <button
+                    type="button"
+                    className={extrasOpen ? "meta-pill meta-action-pill is-active" : "meta-pill meta-action-pill"}
+                    onClick={() => setExtrasOpen((open) => !open)}
+                    aria-pressed={extrasOpen}
+                    title="Attachments, voice note & AI summary"
+                  >
+                    <Paperclip aria-hidden="true" />
+                    <Sparkles aria-hidden="true" />
+                    <span>Files & AI</span>
+                  </button>
+                </div>
+                {extrasOpen ? (
+                  <div className="editor-extras">
+                    <AttachmentsPanel note={note} currentUserId={currentUserId} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
+                    <AiSummaryPanel note={{ ...note, body: displayBody }} readOnly={readOnly} />
+                  </div>
                 ) : null}
                 <RichEditor
                   key={note.id}
@@ -564,34 +592,7 @@ export function NoteEditor({
                   onChange={handleBodyEdit}
                   onSaveShortcut={onSave}
                 />
-                {extrasOpen ? (
-                  <div className="editor-extras">
-                    <AttachmentsPanel note={note} currentUserId={currentUserId} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
-                    <AiSummaryPanel note={{ ...note, body: displayBody }} readOnly={readOnly} />
-                  </div>
-                ) : null}
               </div>
-
-              <footer className="editor-footer">
-                <label htmlFor="note-tags">Tags</label>
-                <input
-                  key={`tags-${note.id}`}
-                  id="note-tags"
-                  defaultValue={note.tags.join(", ")}
-                  readOnly={readOnly}
-                  onChange={(event) => onChange({ tags: event.target.value.split(",") })}
-                  onBlur={commitTags}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      commitTags();
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  placeholder="work, ideas"
-                />
-                <span>Separate tags with commas.</span>
-              </footer>
             </>
           )}
 
