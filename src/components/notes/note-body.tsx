@@ -10,9 +10,16 @@ import { isHtmlBody, sanitizeHtml } from "@/lib/notes/rich";
 
 export function InlineText({ text }: { text: string }): ReactNode {
   return parseInline(text).map((token, index) => {
-    if (token.type === "bold") return <strong key={index}>{token.text}</strong>;
+if (token.type === "bold") return <strong key={index}>{token.text}</strong>;
     if (token.type === "italic") return <em key={index}>{token.text}</em>;
     if (token.type === "code") return <code key={index} className="inline-code">{token.text}</code>;
+    if (token.type === "highlight") {
+      return (
+        <mark key={index} data-color="yellow">
+          {token.text}
+        </mark>
+      );
+    }
     return <span key={index}>{token.text}</span>;
   });
 }

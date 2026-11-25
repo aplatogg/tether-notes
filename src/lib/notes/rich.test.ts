@@ -122,6 +122,34 @@ describe("sanitizeHtml hardening", () => {
     expect(internal).not.toContain("target=");
   });
 
+  it("keeps valid highlight colors on mark and clamps others", () => {
+    const clean = sanitizeHtml(
+      '<p><mark data-color="green">ok</mark><mark data-color="maroon">bad</mark><mark>bare</mark></p>',
+    );
+
+    expect(clean).toContain('<mark data-color="green">ok</mark>');
+    expect(clean).toContain('<mark data-color="yellow">bad</mark>');
+    expect(clean).toContain('<mark data-color="yellow">bare</mark>');
+  });
+
+  it("drops data-color from non-mark elements and any style", () => {
+    const clean = sanitizeHtml(
+      '<p data-color="pink" style="color:red;position:fixed">x</p><span data-color="blue">y</span>',
+    );
+
+    expect(clean).not.toContain('data-color="pink"');
+    expect(clean).not.toContain('data-color="blue"');
+    expect(clean).not.toContain("style=");
+    expect(clean).toContain("<p>x</p>");
+  });
+
+  it("renders ==highlight== markdown as a yellow mark", () => {
+    expect(markdownToHtml("a ==marked== b")).toContain(
+      '<mark data-color="yellow">marked</mark>',
+    );
+    expect(bodyToPlainText("a ==marked== b")).toBe("a marked b");
+  });
+
   it("keeps ordered-list start numbers", () => {
     expect(sanitizeHtml('<ol start="3"><li>three</li></ol>')).toContain('start="3"');
   });

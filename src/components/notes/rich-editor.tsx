@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorContent, Extension, InputRule, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import BoldMark from "@tiptap/extension-bold";
@@ -11,7 +11,16 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import Highlight from "@tiptap/extension-highlight";
+import {
+  SafeHighlight,
+  collectDocHighlights,
+  getLastHighlightColor,
+  setLastHighlightColor,
+  HIGHLIGHT_COLORS,
+  normalizeHighlightColor,
+  type HighlightColor,
+} from "@/lib/notes/highlight";
+import { NoteHighlightsPanel } from "@/components/notes/highlight-panel";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -21,8 +30,10 @@ import Image from "@tiptap/extension-image";
 import {
   Bold,
   Code,
+  ChevronDown,
   Highlighter,
   ImagePlus,
+  PanelRight,
   Italic,
   Link2,
   List,
@@ -147,6 +158,9 @@ interface RichEditorProps {
   readOnly?: boolean;
   onChange: (html: string) => void;
   onSaveShortcut?: () => void;
+  /** Zero-based highlight to select once the editor is ready (global view jump). */
+  highlightTargetIndex?: number | null;
+  onHighlightTargetHandled?: () => void;
 }
 
 interface ToolButtonProps {
@@ -173,7 +187,96 @@ function ToolButton({ label, active, disabled, onClick, children }: ToolButtonPr
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function HighlightControl({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const [color, setColor] = useState<HighlightColor>(() => getLastHighlightColor());
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const active = editor.isActive("highlight");
+  const activeColor = normalizeHighlightColor(editor.getAttributes("highlight").color);
+  const shownColor = active ? activeColor : color;
+
+  function apply(next: HighlightColor) {
+    setColor(next);
+    setLastHighlightColor(next);
+    editor.chain().focus().setHighlight({ color: next }).run();
+    setOpen(false);
+  }
+
+  return (
+    <div className="highlight-control" ref={wrapRef}>
+      <button
+        type="button"
+        className={active ? "format-button is-active has-caret" : "format-button has-caret"}
+        onClick={() => apply(color)}
+        aria-label="Highlight"
+        title="Highlight (Ctrl/Cmd+Shift+H)"
+        aria-pressed={active}
+      >
+        <Highlighter aria-hidden="true" />
+        <span className="highlight-current" data-color={shownColor} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="format-caret"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Highlight colors"
+        aria-expanded={open}
+        title="Highlight colors"
+      >
+        <ChevronDown aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="highlight-menu" role="menu">
+          {HIGHLIGHT_COLORS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="menuitem"
+              className={
+                name === shownColor ? "highlight-menu-item is-active" : "highlight-menu-item"
+              }
+              onClick={() => apply(name)}
+            >
+              <span className="highlight-dot" data-color={name} aria-hidden="true" />
+              {name}
+            </button>
+          ))}
+          <button
+            type="button"
+            role="menuitem"
+            className="highlight-menu-item"
+            onClick={() => {
+              editor.chain().focus().unsetHighlight().run();
+              setOpen(false);
+            }}
+          >
+            Hapus sorotan
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Toolbar({
+  editor,
+  panelOpen,
+  onTogglePanel,
+}: {
+  editor: Editor;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
+}) {
   const [, force] = useState(0);
 
   useEffect(() => {
@@ -217,9 +320,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       <ToolButton label="Strikethrough" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
         <Strikethrough aria-hidden="true" />
       </ToolButton>
-      <ToolButton label="Highlight" active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight().run()}>
-        <Highlighter aria-hidden="true" />
-      </ToolButton>
+      <HighlightControl editor={editor} />
 
       <span className="format-divider" aria-hidden="true" />
 
@@ -289,6 +390,12 @@ function Toolbar({ editor }: { editor: Editor }) {
 
       <span className="format-divider" aria-hidden="true" />
 
+      <ToolButton label="Sorotan" active={panelOpen} onClick={onTogglePanel}>
+        <PanelRight aria-hidden="true" />
+      </ToolButton>
+
+      <span className="format-divider" aria-hidden="true" />
+
       <ToolButton label="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 aria-hidden="true" />
       </ToolButton>
@@ -299,7 +406,15 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }: RichEditorProps) {
+export function RichEditor({
+  value,
+  readOnly = false,
+  onChange,
+  onSaveShortcut,
+  highlightTargetIndex = null,
+  onHighlightTargetHandled,
+}: RichEditorProps) {
+  const [panelOpen, setPanelOpen] = useState(false);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -320,7 +435,7 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
       Link.configure({ openOnClick: false, autolink: true }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Highlight,
+      SafeHighlight.configure({ multicolor: true }),
       Image.configure({ inline: false, allowBase64: true }),
       Table.configure({ resizable: false }),
       TableRow,
@@ -357,15 +472,31 @@ export function RichEditor({ value, readOnly = false, onChange, onSaveShortcut }
       editor.commands.setContent(incoming, { emitUpdate: false });
     }
   }, [editor, value]);
+  useEffect(() => {
+    if (!editor || highlightTargetIndex === null) return;
+    const item = collectDocHighlights(editor.state.doc)[highlightTargetIndex];
+    if (item) {
+      editor.chain().focus().setTextSelection({ from: item.from, to: item.to }).scrollIntoView().run();
+    }
+    onHighlightTargetHandled?.();
+  }, [editor, highlightTargetIndex, onHighlightTargetHandled]);
+
   if (!editor) {
     return <div className="rich-editor-skeleton" aria-hidden="true" />;
   }
 
   return (
     <div className="rich-editor">
-      {readOnly ? null : <Toolbar editor={editor} />}
-      <div className="rich-editor-scroll">
-        <EditorContent editor={editor} />
+      {readOnly ? null : (
+        <Toolbar editor={editor} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen((value) => !value)} />
+      )}
+      <div className="rich-editor-body">
+        <div className="rich-editor-scroll">
+          <EditorContent editor={editor} />
+        </div>
+        {panelOpen && !readOnly ? (
+          <NoteHighlightsPanel editor={editor} onClose={() => setPanelOpen(false)} />
+        ) : null}
       </div>
       <div className="rich-footer">
         <span>{countWords(editor.getHTML())} words</span>

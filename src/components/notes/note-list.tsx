@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Briefcase, CalendarDays, FileText, Folder, Lock, Pin, UsersRound } from "lucide-react";
+import {
+  Bell,
+  Briefcase,
+  CalendarDays,
+  FileText,
+  Folder,
+  Highlighter,
+  Lock,
+  Pin,
+  UsersRound,
+} from "lucide-react";
 import { CalendarView } from "@/components/notes/calendar-view";
 import { bodyToPlainText } from "@/lib/notes/rich";
 import { displayTitle } from "@/lib/notes/model";
@@ -34,6 +44,8 @@ interface NoteListProps {
   onSelectDay: (day: string | null) => void;
   onCreate: () => void;
   hiddenOnMobile: boolean;
+  highlightsOnly: boolean;
+  onToggleHighlightsOnly: () => void;
 }
 
 function formatUpdatedAt(value: string): string {
@@ -112,6 +124,8 @@ export function NoteList({
   onSelectDay,
   onCreate,
   hiddenOnMobile,
+  highlightsOnly,
+  onToggleHighlightsOnly,
 }: NoteListProps) {
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [pickerValue, setPickerValue] = useState("");
@@ -152,6 +166,16 @@ export function NoteList({
         </div>
         <div className="pane-heading-actions">
           <button
+            className={highlightsOnly ? "mobile-new-button is-active" : "mobile-new-button"}
+            type="button"
+            onClick={onToggleHighlightsOnly}
+            aria-label="Show only notes with highlights"
+            aria-pressed={highlightsOnly}
+            title="Ada sorotan"
+          >
+            <Highlighter aria-hidden="true" />
+          </button>
+          <button
             className={showCalendar ? "mobile-new-button is-active" : "mobile-new-button"}
             type="button"
             onClick={onToggleCalendar}
@@ -171,6 +195,12 @@ export function NoteList({
         <CalendarView notes={calendarNotes} selectedDay={calendarDay} onSelectDay={onSelectDay} />
       ) : null}
 
+      {highlightsOnly ? (
+        <div className="active-filter">
+          <span>Ada sorotan</span>
+          <button type="button" onClick={onToggleHighlightsOnly}>Clear</button>
+        </div>
+      ) : null}
       {selectedTag ? (
         <div className="active-filter">
           <span>Tag: {selectedTag}</span>

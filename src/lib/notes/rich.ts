@@ -1,5 +1,6 @@
 import DOMPurify from "isomorphic-dompurify";
 import { parseBlocks, parseInline } from "@/lib/notes/format";
+import { normalizeHighlightColor } from "@/lib/notes/highlight-colors";
 
 const HTML_PATTERN = /^\s*<[a-z][\s\S]*>/i;
 
@@ -19,9 +20,12 @@ function escapeHtml(value: string): string {
 function inlineToHtml(text: string): string {
   return parseInline(text)
     .map((token) => {
-      if (token.type === "bold") return `<strong>${escapeHtml(token.text)}</strong>`;
+if (token.type === "bold") return `<strong>${escapeHtml(token.text)}</strong>`;
       if (token.type === "italic") return `<em>${escapeHtml(token.text)}</em>`;
       if (token.type === "code") return `<code>${escapeHtml(token.text)}</code>`;
+      if (token.type === "highlight") {
+        return `<mark data-color="yellow">${escapeHtml(token.text)}</mark>`;
+      }
       return escapeHtml(token.text);
     })
     .join("");
@@ -117,6 +121,17 @@ DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   const element = node as Element;
 
+  // Highlight color is a closed vocabulary and only belongs on <mark>; a
+  // data-color elsewhere is either a mistake or an attempt to smuggle state.
+  if (element.tagName === "MARK") {
+    element.setAttribute(
+      "data-color",
+      normalizeHighlightColor(element.getAttribute("data-color")),
+    );
+  } else if (element.hasAttribute("data-color")) {
+    element.removeAttribute("data-color");
+  }
+
   if (element.tagName === "INPUT") {
     // Only the disabled checkbox a task list renders survives; this removes the
     // fake-password-field shape a phishing overlay needs.
@@ -166,7 +181,7 @@ export function sanitizeHtml(html: string): string {
     // Links are checked by the hook above; data-* and list attrs stay for the editor.
     ALLOWED_ATTR: [
       "href", "target", "rel", "src", "alt", "title", "data-type",
-      "data-checked", "colspan", "rowspan", "colwidth", "start",
+      "data-checked", "data-color", "colspan", "rowspan", "colwidth", "start",
       "type", "disabled",
     ],
   });

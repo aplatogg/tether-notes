@@ -52,6 +52,8 @@ interface NoteEditorProps {
   onBack: () => void;
   onCreate: () => void;
   hiddenOnMobile: boolean;
+  highlightTargetIndex?: number | null;
+  onHighlightTargetHandled?: () => void;
 }
 
 function noteStateLabel(note: Note, isDirty: boolean, isLocalOnly: boolean): string {
@@ -80,6 +82,8 @@ export function NoteEditor({
   onBack,
   onCreate,
   hiddenOnMobile,
+  highlightTargetIndex = null,
+  onHighlightTargetHandled,
 }: NoteEditorProps) {
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
   const [pinMode, setPinMode] = useState<"set" | "unlock" | "remove" | null>(null);
@@ -415,6 +419,8 @@ export function NoteEditor({
                   value={note.body}
                   onChange={(html) => onChange({ body: html })}
                   onSaveShortcut={onSave}
+                  highlightTargetIndex={highlightTargetIndex}
+                  onHighlightTargetHandled={onHighlightTargetHandled}
                 />
                 {extrasOpen ? (
                   <div className="editor-extras">

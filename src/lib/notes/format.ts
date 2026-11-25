@@ -1,13 +1,13 @@
-export type InlineType = "text" | "bold" | "italic" | "code";
+export type InlineType = "text" | "bold" | "italic" | "code" | "highlight";
 
 export interface InlineToken {
   type: InlineType;
   text: string;
 }
 
-const INLINE_PATTERN = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`)/g;
+const INLINE_PATTERN = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`|==[^=\n]+==)/g;
 
-/** Tokenizes the small inline subset we render: **bold**, *italic*, `code`. */
+/** Tokenizes the small inline subset we render: **bold**, *italic*, `code`, ==highlight==. */
 export function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
 
@@ -18,8 +18,10 @@ export function parseInline(text: string): InlineToken[] {
       tokens.push({ type: "bold", text: chunk.slice(2, -2) });
     } else if (/^\*[^*\n]+\*$/.test(chunk) || /^_[^_\n]+_$/.test(chunk)) {
       tokens.push({ type: "italic", text: chunk.slice(1, -1) });
-    } else if (/^`[^`\n]+`$/.test(chunk)) {
+} else if (/^`[^`\n]+`$/.test(chunk)) {
       tokens.push({ type: "code", text: chunk.slice(1, -1) });
+    } else if (/^==[^=\n]+==$/.test(chunk)) {
+      tokens.push({ type: "highlight", text: chunk.slice(2, -2) });
     } else {
       tokens.push({ type: "text", text: chunk });
     }
