@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  ArrowUpDown,
   Bell,
   Briefcase,
   CalendarDays,
@@ -16,7 +17,7 @@ import { bodyToPlainText } from "@/lib/notes/rich";
 import { displayTitle } from "@/lib/notes/model";
 import { tagColor } from "@/lib/notes/tags";
 import type { Workspace } from "@/lib/supabase/workspaces";
-import type { Note, NoteScope } from "@/lib/notes/types";
+import type { Note, NoteScope, NoteSortMode } from "@/lib/notes/types";
 
 interface NoteListProps {
   notes: Note[];
@@ -24,6 +25,8 @@ interface NoteListProps {
   isLoading: boolean;
   query: string;
   scope: NoteScope;
+  sortMode?: NoteSortMode;
+  onSortModeChange?: (mode: NoteSortMode) => void;
   selectedTag: string | null;
   selectedFolder: string | null;
   shareGroups: string[];
@@ -108,6 +111,8 @@ export function NoteList({
   isLoading,
   query,
   scope,
+  sortMode = "updated",
+  onSortModeChange,
   selectedTag,
   selectedFolder,
   shareGroups,
@@ -166,6 +171,21 @@ export function NoteList({
           <p className="num">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>
         </div>
         <div className="pane-heading-actions">
+          {onSortModeChange ? (
+            <label className="sort-control" title="Sort notes">
+              <ArrowUpDown aria-hidden="true" />
+              <span className="sr-only">Sort notes</span>
+              <select
+                aria-label="Sort notes"
+                value={sortMode}
+                onChange={(event) => onSortModeChange(event.target.value as NoteSortMode)}
+              >
+                <option value="updated">Updated</option>
+                <option value="created">Created</option>
+                <option value="title">Title A–Z</option>
+              </select>
+            </label>
+          ) : null}
           <button
             className={showCalendar ? "icon-button is-active" : "icon-button"}
             type="button"

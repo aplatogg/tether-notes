@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   parseBlocks,
   parseInline,
@@ -30,11 +30,43 @@ interface NoteBodyProps {
 }
 
 export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
+  const [checkedOverrides, setCheckedOverrides] = useState<Record<number, boolean>>({});
+  const [htmlState, setHtmlState] = useState<string | null>(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setCheckedOverrides({});
+      setHtmlState(null);
+    });
+  }, [body]);
+
   if (isHtmlBody(body)) {
+    const currentHtml = htmlState ?? sanitizeHtml(body);
+
+    function handleHtmlClick(event: React.MouseEvent<HTMLDivElement>) {
+      const target = event.target as HTMLElement | null;
+      const item = target?.closest('li[data-type="taskItem"]');
+      if (!item || !event.currentTarget.contains(item)) return;
+      const allItems = Array.from(
+        event.currentTarget.querySelectorAll('li[data-type="taskItem"]'),
+      );
+      const itemIndex = allItems.indexOf(item);
+      if (itemIndex < 0) return;
+
+      const doc = new DOMParser().parseFromString(currentHtml, "text/html");
+      const targetLi = doc.querySelectorAll('li[data-type="taskItem"]')[itemIndex];
+      if (!targetLi) return;
+      const nextChecked = targetLi.getAttribute("data-checked") !== "true";
+      targetLi.setAttribute("data-checked", nextChecked ? "true" : "false");
+      setHtmlState(doc.body.innerHTML);
+      onToggleChecklist?.(itemIndex);
+    }
+
     return (
       <div
         className="note-preview rich-content"
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(body) }}
+        onClick={handleHtmlClick}
+        dangerouslySetInnerHTML={{ __html: currentHtml }}
       />
     );
   }
@@ -71,26 +103,28 @@ export function NoteBody({ body, onToggleChecklist }: NoteBodyProps) {
           className={listType === "checklist" ? "note-checklist" : "note-bullets"}
         >
           {items.map(({ block, index }) => {
-            const interactive = listType === "checklist" && typeof onToggleChecklist === "function";
+            const isChecked = checkedOverrides[index] ?? block.checked === true;
 
             return (
               <li key={index} style={{ paddingLeft: (block.depth ?? 0) * 20 }}>
                 {listType === "checklist" ? (
                   <button
                     type="button"
-                    role={interactive ? "checkbox" : undefined}
-                    aria-checked={interactive ? block.checked === true : undefined}
+                    role="checkbox"
+                    aria-checked={isChecked}
                     aria-label={block.text || "Checklist item"}
-                    disabled={!interactive}
-                    className={block.checked ? "note-check is-checked" : "note-check"}
-                    onClick={() => onToggleChecklist?.(index)}
+                    className={isChecked ? "note-check is-checked" : "note-check"}
+                    onClick={() => {
+                      setCheckedOverrides((prev) => ({ ...prev, [index]: !isChecked }));
+                      onToggleChecklist?.(index);
+                    }}
                   >
-                    {block.checked ? <span className="note-check-mark" aria-hidden="true" /> : null}
+                    {isChecked ? <span className="note-check-mark" aria-hidden="true" /> : null}
                   </button>
                 ) : (
                   <span className="note-bullet" aria-hidden="true" />
                 )}
-                <span className={block.checked ? "note-checked-text" : undefined}>
+                <span className={isChecked ? "note-checked-text" : undefined}>
                   <InlineText text={block.text || "\u00A0"} />
                 </span>
               </li>

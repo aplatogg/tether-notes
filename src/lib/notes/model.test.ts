@@ -618,6 +618,33 @@ describe("sortNotes", () => {
     expect(result).not.toBe(input);
     expect(result[0]).toBe(newer);
   });
+
+  test("supports sorting by created timestamp and by title A-Z while keeping pinned notes first", () => {
+    const notes = [
+      makeNote({
+        id: "b",
+        title: "Bravo",
+        createdAt: "2026-11-22T00:00:00.000Z",
+        updatedAt: "2026-11-20T00:00:00.000Z",
+      }),
+      makeNote({
+        id: "a",
+        title: "Alpha",
+        createdAt: "2026-11-20T00:00:00.000Z",
+        updatedAt: "2026-11-23T00:00:00.000Z",
+      }),
+      makeNote({
+        id: "p",
+        title: "Zulu Pinned",
+        isPinned: true,
+        createdAt: "2026-11-19T00:00:00.000Z",
+        updatedAt: "2026-11-19T00:00:00.000Z",
+      }),
+    ];
+
+    expect(sortNotes(notes, "created").map((note) => note.id)).toEqual(["p", "b", "a"]);
+    expect(sortNotes(notes, "title").map((note) => note.id)).toEqual(["p", "a", "b"]);
+  });
 });
 
 

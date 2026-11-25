@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { exportNotesJson, htmlToMarkdown, noteToMarkdown, parseImportJson } from "./export";
+import {
+  exportNotesJson,
+  htmlToMarkdown,
+  noteToMarkdown,
+  noteToTxt,
+  parseImportFileContent,
+  parseImportJson,
+} from "./export";
 import type { Note } from "./types";
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -56,5 +63,25 @@ describe("export/import JSON round-trip", () => {
 
   test("rejects files that are not tether-notes exports", () => {
     expect(() => parseImportJson(JSON.stringify({ app: "other", notes: [] }))).toThrow();
+  });
+
+  test("exports plain text (.txt) and imports .md and .txt files", () => {
+    const txt = noteToTxt(makeNote());
+    expect(txt).toContain("Trip");
+    expect(txt).toContain("Tags: #travel");
+
+    const [fromMd] = parseImportFileContent(
+      "server-guide.md",
+      "<!-- folder: Ops -->\n# VPS Setup\n\nRun `systemctl status`\n\nTags: #vps #linux\n",
+      "u1",
+    );
+    expect(fromMd.title).toBe("VPS Setup");
+    expect(fromMd.folder).toBe("Ops");
+    expect(fromMd.tags).toEqual(["vps", "linux"]);
+    expect(fromMd.body).toContain("systemctl status");
+
+    const [fromTxt] = parseImportFileContent("quick-note.txt", "Line one\nLine two", null);
+    expect(fromTxt.title).toBe("quick-note");
+    expect(fromTxt.body).toBe("Line one\nLine two");
   });
 });

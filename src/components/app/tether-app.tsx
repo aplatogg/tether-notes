@@ -54,7 +54,7 @@ import {
 import {
   downloadText,
   exportNotesJson,
-  parseImportJson,
+  parseImportFileContent,
 } from "@/lib/notes/export";
 import {
   dueReminders,
@@ -67,7 +67,7 @@ import {
 } from "@/lib/notes/reminder";
 import { useNotesWorkspace } from "@/hooks/use-notes-workspace";
 import { tagColor } from "@/lib/notes/tags";
-import type { Note, NoteScope } from "@/lib/notes/types";
+import type { Note, NoteScope, NoteSortMode } from "@/lib/notes/types";
 import { createSupabaseSyncAdapter } from "@/lib/supabase/adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getNotesDatabase } from "@/lib/db/database";
@@ -165,6 +165,7 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
   const workspace = useNotesWorkspace(userId, adapter);
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [scope, setScope] = useState<NoteScope>("all");
+  const [sortMode, setSortMode] = useState<NoteSortMode>("updated");
   const [query, setQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -281,11 +282,13 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
               ? null
               : (selectedWorkspace ?? undefined),
         }),
+        sortMode,
       ),
     [
       notesWithDraft,
       query,
       scope,
+      sortMode,
       selectedTag,
       effectiveFolder,
       calendarDay,
@@ -502,6 +505,34 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
   function handleTogglePin() {
     if (activeDraft) {
       void persistImmediate({ ...activeDraft, isPinned: !activeDraft.isPinned });
+    }
+  }
+
+  async function handleDuplicate() {
+    if (!activeDraft || activeDraft.lockHash) return;
+    flushCurrentDraft();
+
+    try {
+      const created = await workspace.createNote();
+      const baseTitle = activeDraft.title.trim() || "Untitled note";
+      const copyTitle = `${baseTitle} (Copy)`.slice(0, 500);
+      const saved = await workspace.saveNote({
+        ...created,
+        title: copyTitle,
+        body: activeDraft.body,
+        tags: [...activeDraft.tags],
+        folder: activeDraft.folder ?? DEFAULT_GROUP,
+        workspaceId: activeDraft.workspaceId ?? null,
+        isPinned: activeDraft.isPinned,
+        isArchived: false,
+      });
+      draftRevision.current += 1;
+      setSelectedId(saved.id);
+      setDraft(saved);
+      setIsDirty(false);
+      setMobilePane("editor");
+    } catch {
+      // The workspace surfaces storage errors.
     }
   }
 
@@ -814,9 +845,9 @@ async function handleDeleteForever() {
       const text = await file.text();
       let imported: Note[];
       try {
-        imported = parseImportJson(text);
+        imported = parseImportFileContent(file.name, text, userId);
       } catch {
-        setImportError("That file is not a valid Tether Notes JSON export.");
+        setImportError("That file could not be imported (supported: .json, .md, .txt).");
         return;
       }
       let count = 0;
@@ -1422,12 +1453,12 @@ async function handleDeleteForever() {
                   <Download aria-hidden="true" /> Export all notes (.json)
                 </button>
                 <button type="button" onClick={() => importInputRef.current?.click()}>
-                  <Upload aria-hidden="true" /> Import notes (.json)
+                  <Upload aria-hidden="true" /> Import notes (.json, .md, .txt)
                 </button>
                 <input
                   ref={importInputRef}
                   type="file"
-                  accept="application/json,.json"
+                  accept="application/json,.json,text/markdown,.md,.markdown,text/plain,.txt"
                   className="sr-only"
                   aria-label="Import notes file"
                   onChange={(event) => void handleImportFile(event.target.files?.[0])}
@@ -1492,6 +1523,8 @@ async function handleDeleteForever() {
               isLoading={workspace.isLoading}
               query={query}
               scope={scope}
+              sortMode={sortMode}
+              onSortModeChange={setSortMode}
               selectedTag={selectedTag}
               selectedFolder={effectiveFolder}
               showCalendar={showCalendar}
@@ -1523,6 +1556,7 @@ async function handleDeleteForever() {
               workspaces={workspaces}
               onChange={handleDraftChange}
               onSave={flushCurrentDraft}
+              onDuplicate={() => void handleDuplicate()}
               onTogglePin={handleTogglePin}
               onToggleArchive={handleToggleArchive}
               onDelete={() => void handleDelete()}

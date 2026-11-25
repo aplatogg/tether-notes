@@ -2665,3 +2665,204 @@ button:disabled {
   font-family: inherit;
 }
 
+/* ---------- code block copy, slash menu, export menu, sort ---------- */
+.code-block-wrap {
+  position: relative;
+  margin-top: 10px;
+}
+
+.code-block-wrap pre {
+  margin: 0;
+  padding-top: 30px;
+}
+
+.code-copy-button {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid var(--sheet-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.code-copy-button:hover,
+.code-copy-button.is-copied {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.code-copy-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.slash-menu {
+  position: sticky;
+  top: 4px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(260px, 100%);
+  max-height: 250px;
+  margin-bottom: 8px;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--sheet-border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(15, 32, 39, 0.16);
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item.is-active {
+  background: var(--surface-active);
+}
+
+.slash-menu-item kbd {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.export-control {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: 196px;
+  padding: 4px;
+  border: 1px solid var(--sheet-border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(15, 32, 39, 0.16);
+  gap: 2px;
+}
+
+.export-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.export-menu button:hover {
+  background: var(--surface-active);
+}
+
+.export-menu svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  gap: 5px;
+}
+
+.sort-control svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.sort-control select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.note-preview.rich-content ul[data-type="taskList"] li[data-type="taskItem"] {
+  cursor: pointer;
+}
+
+.note-preview.rich-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+@media print {
+  body {
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .sidebar,
+  .topbar,
+  .note-list-pane,
+  .editor-toolbar,
+  .rich-toolbar,
+  .editor-footer,
+  .folder-input,
+  .editor-extras,
+  .highlight-panel,
+  .code-copy-button {
+    display: none !important;
+  }
+
+  .app-frame,
+  .workspace-sheet,
+  .workspace-panes,
+  .note-editor-pane,
+  .editor-fields,
+  .rich-editor,
+  .rich-editor-body,
+  .rich-editor-scroll {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+}
+

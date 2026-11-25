@@ -1,6 +1,6 @@
 import { stripBlockPrefix } from "./format";
 import { bodyToPlainText, isHtmlBody } from "./rich";
-import type { CreateDraftNoteInput, Note, NoteFilter } from "./types";
+import type { CreateDraftNoteInput, Note, NoteFilter, NoteSortMode } from "./types";
 
 /** New notes land in this group by default, and it is the default list view. */
 export const DEFAULT_GROUP = "General";
@@ -383,23 +383,31 @@ export function filterNotes(notes: readonly Note[], filter: NoteFilter): Note[] 
   });
 }
 
-export function sortNotes(notes: readonly Note[]): Note[] {
+export function sortNotes(notes: readonly Note[], mode: NoteSortMode = "updated"): Note[] {
   return notes
-    .map((note) => ({ note, updatedAt: parseRfc3339Timestamp(note.updatedAt) }))
+    .map((note) => ({
+      note,
+      timestamp: parseRfc3339Timestamp(mode === "created" ? note.createdAt : note.updatedAt),
+    }))
     .sort((left, right) => {
       if (left.note.isPinned !== right.note.isPinned) {
         return left.note.isPinned ? -1 : 1;
       }
 
-      const leftHasValidTimestamp = left.updatedAt !== null;
-      const rightHasValidTimestamp = right.updatedAt !== null;
+      if (mode === "title") {
+        const titleOrder = displayTitle(left.note).localeCompare(displayTitle(right.note));
+        if (titleOrder !== 0) return titleOrder;
+      }
+
+      const leftHasValidTimestamp = left.timestamp !== null;
+      const rightHasValidTimestamp = right.timestamp !== null;
 
       if (leftHasValidTimestamp !== rightHasValidTimestamp) {
         return leftHasValidTimestamp ? -1 : 1;
       }
 
-      if (left.updatedAt && right.updatedAt) {
-        const timestampOrder = compareTimestamps(left.updatedAt, right.updatedAt);
+      if (left.timestamp && right.timestamp) {
+        const timestampOrder = compareTimestamps(left.timestamp, right.timestamp);
 
         if (timestampOrder !== 0) {
           return timestampOrder > 0 ? -1 : 1;

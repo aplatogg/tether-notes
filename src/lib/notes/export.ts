@@ -185,3 +185,76 @@ export function downloadText(filename: string, text: string, mime = "application
 export function notePlainText(note: Note): string {
   return isHtmlBody(note.body) ? bodyToPlainText(note.body) : note.body;
 }
+
+/** Formats a single note as a clean plain-text (.txt) file. */
+export function noteToTxt(note: Note): string {
+  const title = note.title.trim();
+  const body = notePlainText(note).trim();
+  const tags = note.tags.length > 0 ? `Tags: ${note.tags.map((t) => `#${t}`).join(" ")}` : "";
+  return [title, body, tags].filter(Boolean).join("\n\n") + "\n";
+}
+
+/**
+ * Parses an imported file by extension/content:
+ * - `.json` (Tether Notes export bundle) -> returns all notes in the bundle
+ * - `.md` / `.markdown` / `.txt` -> creates a new note from the file's title and body
+ */
+export function parseImportFileContent(
+  filename: string,
+  text: string,
+  userId: string | null = null,
+): Note[] {
+  const lower = filename.trim().toLowerCase();
+  if (lower.endsWith(".json")) {
+    return parseImportJson(text);
+  }
+
+  const now = new Date().toISOString();
+  const baseName = filename.replace(/\.(?:md|markdown|txt)$/i, "").trim();
+  const normalized = text.replace(/\r\n?/g, "\n");
+
+  let title = baseName;
+  let bodyText = normalized;
+  let folder = "";
+  const tags: string[] = [];
+
+  if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
+    const folderMatch = /^<!--\s*folder:\s*([^\n]+?)\s*-->\n?/i.exec(bodyText);
+    if (folderMatch) {
+      folder = folderMatch[1].trim().slice(0, 60);
+      bodyText = bodyText.slice(folderMatch[0].length);
+    }
+    const headingMatch = /^\s*#\s+([^\n]+)\n+/.exec(bodyText);
+    if (headingMatch) {
+      title = headingMatch[1].replace(/\\([\\`*_[\]{}()#+\-.!|])/g, "$1").trim() || baseName;
+      bodyText = bodyText.slice(headingMatch[0].length);
+    }
+    const tagsMatch = /\nTags:\s*((?:#[^\s#]+\s*)+)\s*$/i.exec(bodyText);
+    if (tagsMatch) {
+      for (const raw of tagsMatch[1].split(/\s+/)) {
+        const clean = raw.replace(/^#+/, "").trim().toLowerCase();
+        if (clean && tags.length < 20) tags.push(clean.slice(0, 50));
+      }
+      bodyText = bodyText.slice(0, tagsMatch.index);
+    }
+  }
+
+  return [
+    {
+      id: globalThis.crypto.randomUUID(),
+      userId,
+      title: (title || "Imported note").slice(0, 500),
+      body: bodyText.trim().slice(0, 500_000),
+      tags,
+      isPinned: false,
+      isArchived: false,
+      lockHash: null,
+      folder: folder || undefined,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: "pending",
+    },
+  ];
+}
+

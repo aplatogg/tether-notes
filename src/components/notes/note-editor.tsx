@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
   ChevronLeft,
+  CopyPlus,
   Download,
   FileText,
   Link2,
@@ -14,6 +15,7 @@ import {
   Paperclip,
   Pin,
   PinOff,
+  Printer,
   Save,
   Trash2,
   UserPlus,
@@ -21,8 +23,13 @@ import {
 } from "lucide-react";
 import { RichEditor } from "@/components/notes/rich-editor";
 import { AiSummaryPanel, AttachmentsPanel, FolderInput, ReminderControl, WorkspaceSelect } from "@/components/notes/note-extras";
-import { downloadText, noteToMarkdown } from "@/lib/notes/export";
-import { createLockSecret, verifyLockPin } from "@/lib/notes/lock";
+import { downloadText, exportNotesJson, noteToMarkdown, noteToTxt } from "@/lib/notes/export";
+import {
+  createLockSecret,
+  decryptLockedBody,
+  encryptLockedBody,
+  isEncryptedBody,
+} from "@/lib/notes/lock";
 import { displayTitle, normalizeTags } from "@/lib/notes/model";
 import { trashDaysLeft } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
@@ -46,6 +53,7 @@ interface NoteEditorProps {
   workspaces: Workspace[];
   onChange: (changes: Partial<Note>) => void;
   onSave: () => void;
+  onDuplicate?: () => void;
   onTogglePin: () => void;
   onToggleArchive: () => void;
   onDelete: () => void;
@@ -74,6 +82,7 @@ export function NoteEditor({
   workspaces,
   onChange,
   onSave,
+  onDuplicate,
   onTogglePin,
   onToggleArchive,
   onDelete,
@@ -84,6 +93,8 @@ export function NoteEditor({
   hiddenOnMobile,
 }: NoteEditorProps) {
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
+  const [unlockedPins, setUnlockedPins] = useState<Record<string, string>>({});
+  const [decryptedBodies, setDecryptedBodies] = useState<Record<string, string>>({});
   const [pinMode, setPinMode] = useState<"set" | "unlock" | "remove" | null>(null);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
@@ -95,24 +106,67 @@ export function NoteEditor({
   const [grantEmail, setGrantEmail] = useState("");
   const [grantBusy, setGrantBusy] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!exportWrapRef.current?.contains(event.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [exportOpen]);
 
   const locked = Boolean(note?.lockHash) && !(note ? unlocked[note.id] : false);
   const readOnly = note?.shared === true;
+  const activePin = note ? unlockedPins[note.id] : undefined;
+  const displayBody =
+    note && note.lockHash && isEncryptedBody(note.body)
+      ? (decryptedBodies[note.id] ?? "")
+      : (note?.body ?? "");
 
   function commitTags() {
     if (!note) return;
     onChange({ tags: normalizeTags(note.tags) });
   }
 
-  function exportMarkdown() {
-    if (!note || locked) return;
-    const slug =
-      displayTitle(note)
+  function noteSlug(target: Note): string {
+    return (
+      displayTitle(target)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
-        .slice(0, 60) || "note";
-    downloadText(`${slug}.md`, noteToMarkdown(note), "text/markdown");
+        .slice(0, 60) || "note"
+    );
+  }
+
+  function exportSingleNote(format: "md" | "txt" | "json" | "pdf") {
+    if (!note || locked) return;
+    setExportOpen(false);
+    const unlockedView: Note = { ...note, body: displayBody };
+    const slug = noteSlug(unlockedView);
+    if (format === "md") {
+      downloadText(`${slug}.md`, noteToMarkdown(unlockedView), "text/markdown");
+    } else if (format === "txt") {
+      downloadText(`${slug}.txt`, noteToTxt(unlockedView), "text/plain");
+    } else if (format === "json") {
+      downloadText(`${slug}.json`, exportNotesJson([unlockedView]), "application/json");
+    } else if (format === "pdf") {
+      window.print();
+    }
+  }
+
+  function handleBodyEdit(html: string) {
+    if (!note) return;
+    if (note.lockHash && activePin) {
+      setDecryptedBodies((current) => ({ ...current, [note.id]: html }));
+      void encryptLockedBody(html, activePin, note.lockHash).then((ciphertext) => {
+        onChange({ body: ciphertext });
+      });
+      return;
+    }
+    onChange({ body: html });
   }
 
   async function openPinModal(next: "set" | "unlock" | "remove") {
@@ -131,18 +185,40 @@ export function NoteEditor({
 
     if (pinMode === "set") {
       const secret = await createLockSecret(pin);
-      onChange({ lockHash: secret });
+      const encrypted = await encryptLockedBody(displayBody, pin, secret);
+      setDecryptedBodies((current) => ({ ...current, [note.id]: displayBody }));
+      setUnlockedPins((current) => ({ ...current, [note.id]: pin }));
       setUnlocked((current) => ({ ...current, [note.id]: true }));
+      onChange({ lockHash: secret, body: encrypted });
     } else {
-      const ok = note.lockHash ? await verifyLockPin(pin, note.lockHash) : false;
-      if (!ok) {
+      const plaintext = note.lockHash
+        ? await decryptLockedBody(note.body, pin, note.lockHash)
+        : null;
+      if (plaintext === null) {
         setPinError("Wrong PIN. Try again.");
         return;
       }
       if (pinMode === "unlock") {
+        setDecryptedBodies((current) => ({ ...current, [note.id]: plaintext }));
+        setUnlockedPins((current) => ({ ...current, [note.id]: pin }));
         setUnlocked((current) => ({ ...current, [note.id]: true }));
+        // Transparently upgrade legacy unencrypted locked notes to AES-256-GCM.
+        if (note.lockHash && !isEncryptedBody(note.body) && !readOnly) {
+          const encrypted = await encryptLockedBody(plaintext, pin, note.lockHash);
+          onChange({ body: encrypted });
+        }
       } else {
-        onChange({ lockHash: null });
+        setDecryptedBodies((current) => {
+          const copy = { ...current };
+          delete copy[note.id];
+          return copy;
+        });
+        setUnlockedPins((current) => {
+          const copy = { ...current };
+          delete copy[note.id];
+          return copy;
+        });
+        onChange({ lockHash: null, body: plaintext });
       }
     }
 
@@ -277,18 +353,49 @@ export function NoteEditor({
               >
                 <Paperclip aria-hidden="true" />
               </button>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={exportMarkdown}
-                aria-label="Export note as Markdown"
-                title="Export Markdown (.md)"
-                disabled={locked}
-              >
-                <Download aria-hidden="true" />
-              </button>
+              <div className="export-control" ref={exportWrapRef}>
+                <button
+                  className={exportOpen ? "icon-button is-active" : "icon-button"}
+                  type="button"
+                  onClick={() => setExportOpen((value) => !value)}
+                  aria-label="Export note"
+                  aria-expanded={exportOpen}
+                  title="Export note (.md / .txt / .json / PDF)"
+                  disabled={locked}
+                >
+                  <Download aria-hidden="true" />
+                </button>
+                {exportOpen && !locked ? (
+                  <div className="export-menu" role="menu" aria-label="Export format">
+                    <button type="button" role="menuitem" onClick={() => exportSingleNote("md")}>
+                      <FileText aria-hidden="true" /> Markdown (.md)
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => exportSingleNote("txt")}>
+                      <FileText aria-hidden="true" /> Plain text (.txt)
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => exportSingleNote("json")}>
+                      <Download aria-hidden="true" /> Note JSON (.json)
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => exportSingleNote("pdf")}>
+                      <Printer aria-hidden="true" /> Print / Save as PDF
+                    </button>
+                  </div>
+                ) : null}
+              </div>
               {readOnly ? null : (
                 <>
+                  {onDuplicate ? (
+                    <button
+                      className="icon-button"
+                      type="button"
+                      onClick={onDuplicate}
+                      aria-label="Duplicate note"
+                      title="Duplicate note"
+                      disabled={locked}
+                    >
+                      <CopyPlus aria-hidden="true" />
+                    </button>
+                  ) : null}
                   <ReminderControl note={note} readOnly={readOnly} onChange={onChange} />
                   <button
                     className="icon-button"
@@ -408,7 +515,7 @@ export function NoteEditor({
             <div className="lock-overlay">
               <Lock aria-hidden="true" />
               <h2>This note is locked</h2>
-              <p>Enter the PIN to read and edit it on this device.</p>
+              <p>Enter the PIN to decrypt and edit it on this device.</p>
               <button className="primary-button" type="button" onClick={() => void openPinModal("unlock")}>
                 Unlock note
               </button>
@@ -435,14 +542,14 @@ export function NoteEditor({
                 <RichEditor
                   key={note.id}
                   readOnly={note.deletedAt !== null || readOnly}
-                  value={note.body}
-                  onChange={(html) => onChange({ body: html })}
+                  value={displayBody}
+                  onChange={handleBodyEdit}
                   onSaveShortcut={onSave}
                 />
                 {extrasOpen ? (
                   <div className="editor-extras">
                     <AttachmentsPanel note={note} currentUserId={currentUserId} client={getSupabaseBrowserClient()} readOnly={readOnly || note.deletedAt !== null} />
-                    <AiSummaryPanel note={note} readOnly={readOnly} />
+                    <AiSummaryPanel note={{ ...note, body: displayBody }} readOnly={readOnly} />
                   </div>
                 ) : null}
               </div>
@@ -533,10 +640,10 @@ export function NoteEditor({
                 <h2>{pinMode === "set" ? "Lock this note" : pinMode === "unlock" ? "Unlock note" : "Remove lock"}</h2>
                 <p>
                   {pinMode === "set"
-                    ? "Choose a PIN with at least 4 characters. It is stored as a hash with the note."
+                    ? "Choose a PIN with at least 4 characters. The note body is encrypted with AES-256-GCM."
                     : pinMode === "unlock"
                       ? "Enter the PIN you set for this note."
-                      : "Enter the current PIN to remove the lock."}
+                      : "Enter the current PIN to decrypt and remove the lock."}
                 </p>
                 <label className="sr-only" htmlFor="note-pin">PIN</label>
                 <input
@@ -568,7 +675,3 @@ export function NoteEditor({
     </section>
   );
 }
-
-
-
-

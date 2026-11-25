@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { EditorContent, Extension, InputRule, useEditor, type Editor } from "@tiptap/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  EditorContent,
+  Extension,
+  InputRule,
+  NodeViewContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  useEditor,
+  type Editor,
+  type NodeViewProps,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import CodeBlock from "@tiptap/extension-code-block";
 import BoldMark from "@tiptap/extension-bold";
 import ItalicMark from "@tiptap/extension-italic";
 import StrikeMark from "@tiptap/extension-strike";
 import { TextSelection } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
@@ -28,10 +40,13 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import Image from "@tiptap/extension-image";
 import {
   Bold,
+  Check,
   Code,
+  Copy,
   ChevronDown,
   Highlighter,
   ImagePlus,
+  Minus,
   PanelRight,
   Italic,
   Link2,
@@ -46,6 +61,191 @@ import {
   Undo2,
 } from "lucide-react";
 import { countWords, markdownToHtml } from "@/lib/notes/rich";
+
+const MAX_INLINE_IMAGE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME = /^image\/(?:png|jpe?g|gif|webp)$/i;
+
+function insertImageFileIntoEditor(editor: Editor, file: File | undefined): boolean {
+  if (!file || !ALLOWED_IMAGE_MIME.test(file.type)) return false;
+  if (file.size > MAX_INLINE_IMAGE_BYTES) {
+    window.alert("Inline image must be under 2 MB. Use the Attachments panel for larger files.");
+    return true;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result === "string") {
+      editor.chain().focus().setImage({ src: reader.result, alt: file.name }).run();
+    }
+  };
+  reader.readAsDataURL(file);
+  return true;
+}
+
+function insertImageFileIntoView(view: EditorView, file: File | undefined): boolean {
+  if (!file || !ALLOWED_IMAGE_MIME.test(file.type)) return false;
+  if (file.size > MAX_INLINE_IMAGE_BYTES) {
+    window.alert("Inline image must be under 2 MB. Use the Attachments panel for larger files.");
+    return true;
+  }
+  const imageType = view.state.schema.nodes.image;
+  if (!imageType) return false;
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result === "string") {
+      const node = imageType.create({ src: reader.result, alt: file.name });
+      view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+    }
+  };
+  reader.readAsDataURL(file);
+  return true;
+}
+
+function CopyableCodeBlockView({ node }: NodeViewProps) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    const text = node.textContent ?? "";
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Clipboard blocked in non-secure context
+    }
+  }
+
+  return (
+    <NodeViewWrapper className="code-block-wrap">
+      <button
+        type="button"
+        contentEditable={false}
+        className={copied ? "code-copy-button is-copied" : "code-copy-button"}
+        onClick={() => void handleCopy()}
+        aria-label="Copy code block"
+        title="Copy code"
+      >
+        {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+        <span>{copied ? "Copied" : "Copy"}</span>
+      </button>
+      <pre>
+        <NodeViewContent as={"code" as never} />
+      </pre>
+    </NodeViewWrapper>
+  );
+}
+
+const CopyableCodeBlock = CodeBlock.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(CopyableCodeBlockView);
+  },
+});
+
+export interface SlashCommandItem {
+  id: string;
+  label: string;
+  shortcut: string;
+  keywords: string[];
+  run: (editor: Editor) => void;
+}
+
+export const SLASH_COMMANDS: SlashCommandItem[] = [
+  {
+    id: "h1",
+    label: "Heading 1",
+    shortcut: "/h1",
+    keywords: ["h1", "heading1", "title", "header"],
+    run: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+  },
+  {
+    id: "h2",
+    label: "Heading 2",
+    shortcut: "/h2",
+    keywords: ["h2", "heading2", "subtitle", "subheading"],
+    run: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+  },
+  {
+    id: "h3",
+    label: "Heading 3",
+    shortcut: "/h3",
+    keywords: ["h3", "heading3"],
+    run: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+  },
+  {
+    id: "todo",
+    label: "Checklist",
+    shortcut: "/todo",
+    keywords: ["todo", "task", "check", "checklist", "checkbox"],
+    run: (editor) => editor.chain().focus().toggleTaskList().run(),
+  },
+  {
+    id: "bullet",
+    label: "Bulleted list",
+    shortcut: "/bullet",
+    keywords: ["bullet", "list", "ul"],
+    run: (editor) => editor.chain().focus().toggleBulletList().run(),
+  },
+  {
+    id: "numbered",
+    label: "Numbered list",
+    shortcut: "/num",
+    keywords: ["num", "numbered", "ordered", "ol"],
+    run: (editor) => editor.chain().focus().toggleOrderedList().run(),
+  },
+  {
+    id: "code",
+    label: "Code block",
+    shortcut: "/code",
+    keywords: ["code", "pre", "snippet", "terminal"],
+    run: (editor) => editor.chain().focus().toggleCodeBlock().run(),
+  },
+  {
+    id: "quote",
+    label: "Quote",
+    shortcut: "/quote",
+    keywords: ["quote", "blockquote", "callout"],
+    run: (editor) => editor.chain().focus().toggleBlockquote().run(),
+  },
+  {
+    id: "table",
+    label: "Table (3×3)",
+    shortcut: "/table",
+    keywords: ["table", "grid"],
+    run: (editor) =>
+      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+  {
+    id: "divider",
+    label: "Divider line",
+    shortcut: "/divider",
+    keywords: ["divider", "hr", "line", "rule"],
+    run: (editor) => editor.chain().focus().setHorizontalRule().run(),
+  },
+];
+
+interface SlashMatch {
+  query: string;
+  from: number;
+  to: number;
+}
+
+function detectSlashMatch(editor: Editor): SlashMatch | null {
+  const { selection } = editor.state;
+  if (!selection.empty) return null;
+  if (editor.isActive("codeBlock")) return null;
+
+  const { $from } = selection;
+  const textBefore = $from.parent.textBetween(0, $from.parentOffset, "\n", "\0");
+  const match = /(?:^|\s)\/([a-z0-9-]{0,16})$/i.exec(textBefore);
+  if (!match) return null;
+
+  const query = (match[1] ?? "").toLowerCase();
+  const slashLength = query.length + 1;
+  return {
+    query,
+    from: $from.pos - slashLength,
+    to: $from.pos,
+  };
+}
 
 /**
  * Word-like autoformat. Markdown markers convert only when the closing marker is
@@ -152,6 +352,7 @@ const TabKeymap = Extension.create({
     };
   },
 });
+
 interface RichEditorProps {
   value: string;
   readOnly?: boolean;
@@ -300,22 +501,6 @@ function Toolbar({
     editor.chain().focus().extendMarkRange("link").setLink({ href: trimmed }).run();
   }
 
-  function handleImageFile(file: File | undefined) {
-    if (!file || !/^image\/(?:png|jpe?g|gif|webp)$/i.test(file.type)) return;
-    // Keep inline base64 images bounded (2 MB) so note rows remain fast to sync.
-    if (file.size > 2 * 1024 * 1024) {
-      window.alert("Inline image must be under 2 MB. Use the Attachments panel for larger files.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        editor.chain().focus().setImage({ src: reader.result, alt: file.name }).run();
-      }
-    };
-    reader.readAsDataURL(file);
-  }
-
   return (
     <div className="editor-format-bar rich-toolbar" role="toolbar" aria-label="Text formatting">
       <ToolButton label="Bold" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
@@ -379,6 +564,9 @@ function Toolbar({
       <ToolButton label="Code block" active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
         <Code aria-hidden="true" />
       </ToolButton>
+      <ToolButton label="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+        <Minus aria-hidden="true" />
+      </ToolButton>
 
       <span className="format-divider" aria-hidden="true" />
 
@@ -395,7 +583,7 @@ function Toolbar({
         className="sr-only"
         aria-label="Insert image"
         onChange={(event) => {
-          handleImageFile(event.target.files?.[0]);
+          insertImageFileIntoEditor(editor, event.target.files?.[0]);
           event.currentTarget.value = "";
         }}
       />
@@ -434,17 +622,22 @@ export function RichEditor({
   onSaveShortcut,
 }: RichEditorProps) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [slashMatch, setSlashMatch] = useState<SlashMatch | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         link: false,
+        codeBlock: false,
         // Replaced below: built-in markdown mark rules fired too eagerly.
         bold: false,
         italic: false,
         strike: false,
       }),
+      CopyableCodeBlock,
       BoldMark.extend({ addInputRules: () => [] }),
       ItalicMark.extend({ addInputRules: () => [] }),
       StrikeMark.extend({ addInputRules: () => [] }),
@@ -466,9 +659,54 @@ export function RichEditor({
     editable: !readOnly,
     editorProps: {
       attributes: { class: "rich-content", spellcheck: "true" },
+      handlePaste: (view, event): boolean => {
+        const items = Array.from(event.clipboardData?.items ?? []);
+        const imageItem = items.find((item) => ALLOWED_IMAGE_MIME.test(item.type));
+        if (!imageItem) return false;
+        const file = imageItem.getAsFile();
+        if (!file) return false;
+        event.preventDefault();
+        return insertImageFileIntoView(view, file);
+      },
+      handleDrop: (view, event, _slice, moved): boolean => {
+        if (moved) return false;
+        const files = Array.from(event.dataTransfer?.files ?? []);
+        const imageFile = files.find((file) => ALLOWED_IMAGE_MIME.test(file.type));
+        if (!imageFile) return false;
+        event.preventDefault();
+        return insertImageFileIntoView(view, imageFile);
+      },
     },
-    onUpdate: ({ editor: instance }) => onChange(instance.getHTML()),
+    onUpdate: ({ editor: instance }) => {
+      onChange(instance.getHTML());
+      const match = detectSlashMatch(instance);
+      setSlashMatch(match);
+      setSlashIndex(0);
+    },
+    onSelectionUpdate: ({ editor: instance }) => {
+      const match = detectSlashMatch(instance);
+      setSlashMatch(match);
+    },
   });
+
+  const filteredSlashCommands = useMemo(() => {
+    if (!slashMatch) return [];
+    const q = slashMatch.query;
+    if (!q) return SLASH_COMMANDS;
+    return SLASH_COMMANDS.filter(
+      (cmd) =>
+        cmd.id.startsWith(q) ||
+        cmd.label.toLowerCase().includes(q) ||
+        cmd.keywords.some((kw) => kw.startsWith(q)),
+    );
+  }, [slashMatch]);
+
+  function executeSlashCommand(cmd: SlashCommandItem) {
+    if (!editor || !slashMatch) return;
+    editor.chain().focus().deleteRange({ from: slashMatch.from, to: slashMatch.to }).run();
+    cmd.run(editor);
+    setSlashMatch(null);
+  }
 
   useEffect(() => {
     if (!editor) return;
@@ -476,11 +714,38 @@ export function RichEditor({
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         onSaveShortcut?.();
+        return;
+      }
+
+      if (slashMatch && filteredSlashCommands.length > 0) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setSlashIndex((current) => (current + 1) % filteredSlashCommands.length);
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setSlashIndex((current) =>
+            (current - 1 + filteredSlashCommands.length) % filteredSlashCommands.length,
+          );
+          return;
+        }
+        if (event.key === "Enter" || event.key === "Tab") {
+          event.preventDefault();
+          const picked = filteredSlashCommands[slashIndex] ?? filteredSlashCommands[0];
+          if (picked) executeSlashCommand(picked);
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setSlashMatch(null);
+        }
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [editor, onSaveShortcut]);
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, onSaveShortcut, slashMatch, filteredSlashCommands, slashIndex]);
 
   // Remote updates (Realtime from another device) refresh the document only while
   // this editor is unfocused, so typing never loses the caret.
@@ -503,6 +768,26 @@ export function RichEditor({
       )}
       <div className="rich-editor-body">
         <div className="rich-editor-scroll">
+          {slashMatch && filteredSlashCommands.length > 0 && !readOnly ? (
+            <div className="slash-menu" role="listbox" aria-label="Insert block">
+              {filteredSlashCommands.map((cmd, idx) => (
+                <button
+                  key={cmd.id}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === slashIndex}
+                  className={idx === slashIndex ? "slash-menu-item is-active" : "slash-menu-item"}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeSlashCommand(cmd);
+                  }}
+                >
+                  <span>{cmd.label}</span>
+                  <kbd>{cmd.shortcut}</kbd>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <EditorContent editor={editor} />
         </div>
         {panelOpen && !readOnly ? (
@@ -511,17 +796,7 @@ export function RichEditor({
       </div>
       <div className="rich-footer">
         <span>{countWords(editor.getHTML())} words</span>
-
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

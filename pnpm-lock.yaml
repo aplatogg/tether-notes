@@ -181,6 +181,9 @@ importers:
       '@tiptap/extension-bold':
         specifier: ^3.35.0
         version: 3.35.0(@tiptap/core@3.35.0(@tiptap/pm@3.35.0))
+      '@tiptap/extension-code-block':
+        specifier: ^3.35.0
+        version: 3.35.0(@tiptap/core@3.35.0(@tiptap/pm@3.35.0))(@tiptap/pm@3.35.0)
       '@tiptap/extension-highlight':
         specifier: ^3.35.0
         version: 3.35.0(@tiptap/core@3.35.0(@tiptap/pm@3.35.0))

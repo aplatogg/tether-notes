@@ -260,7 +260,7 @@ function htmlToPlainTextFast(html: string): string {
 
 /** Plain text used for list previews, search and titles. */
 export function bodyToPlainText(body: string): string {
-  if (!body) return "";
+  if (!body || body.startsWith("enc:v1:")) return "";
 
   const cached = plainTextCache.get(body);
   if (cached !== undefined) return cached;

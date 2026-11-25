@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createLockSecret, isLockSecret, verifyLockPin } from "@/lib/notes/lock";
+import {
+  createLockSecret,
+  decryptLockedBody,
+  encryptLockedBody,
+  isEncryptedBody,
+  isLockSecret,
+  verifyLockPin,
+} from "@/lib/notes/lock";
 import { tagColor } from "@/lib/notes/tags";
 
 describe("tagColor", () => {
@@ -34,5 +41,24 @@ describe("note lock", () => {
   it("rejects malformed secrets", async () => {
     await expect(verifyLockPin("4821", "garbage")).resolves.toBe(false);
     expect(isLockSecret("nope")).toBe(false);
+  });
+
+  it("encrypts and decrypts locked note bodies with AES-256-GCM", async () => {
+    const secret = await createLockSecret("9081");
+    const plaintext = "<p>Top secret <strong>VPS credentials</strong> — root@10.0.0.1</p>";
+    const encrypted = await encryptLockedBody(plaintext, "9081", secret);
+
+    expect(isEncryptedBody(encrypted)).toBe(true);
+    expect(encrypted).not.toContain("VPS credentials");
+    expect(encrypted).not.toContain("root@10.0.0.1");
+
+    await expect(decryptLockedBody(encrypted, "9081", secret)).resolves.toBe(plaintext);
+    await expect(decryptLockedBody(encrypted, "0000", secret)).resolves.toBeNull();
+  });
+
+  it("remains backward-compatible with legacy unencrypted locked bodies", async () => {
+    const secret = await createLockSecret("4821");
+    await expect(decryptLockedBody("<p>legacy</p>", "4821", secret)).resolves.toBe("<p>legacy</p>");
+    await expect(decryptLockedBody("<p>legacy</p>", "9999", secret)).resolves.toBeNull();
   });
 });

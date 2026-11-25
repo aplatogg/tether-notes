@@ -42,6 +42,7 @@ export interface CreateDraftNoteInput {
 }
 
 export type NoteScope = "all" | "pinned" | "archived" | "trash" | "shared";
+export type NoteSortMode = "updated" | "created" | "title";
 
 export interface NoteFilter {
   scope: NoteScope;
