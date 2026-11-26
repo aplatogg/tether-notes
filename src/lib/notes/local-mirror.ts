@@ -35,6 +35,22 @@ type WindowWithMirrorApis = Window & {
   }) => Promise<DirectoryHandleLike>;
 };
 
+export function isWindowsPc(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return false;
+  const navWithUAData = navigator as Navigator & {
+    userAgentData?: { platform?: string; mobile?: boolean };
+  };
+  if (navWithUAData.userAgentData) {
+    if (navWithUAData.userAgentData.mobile) return false;
+    if (navWithUAData.userAgentData.platform) {
+      return /win/i.test(navWithUAData.userAgentData.platform);
+    }
+  }
+  return /Win(dows|32|64|NT)/i.test(ua);
+}
+
 export function isTauriDesktop(): boolean {
   if (typeof window === "undefined") return false;
   const w = window as WindowWithMirrorApis;
@@ -42,7 +58,7 @@ export function isTauriDesktop(): boolean {
 }
 
 export function supportsDirectoryPicker(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined" || !isWindowsPc()) return false;
   const w = window as WindowWithMirrorApis;
   return typeof w.showDirectoryPicker === "function";
 }
@@ -134,6 +150,8 @@ async function writeToDirectoryHandle(
 
 export async function mirrorNotesToLocalDisk(notes: Note[]): Promise<void> {
   if (typeof window === "undefined" || notes.length === 0) return;
+  // Strictly run local disk auto-backup on Windows PC only (never on iOS / Android).
+  if (!isTauriDesktop() && !isWindowsPc()) return;
 
   const ownNotes = notes.filter((n) => !n.shared);
   if (ownNotes.length === 0) return;
