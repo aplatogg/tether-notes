@@ -44,6 +44,12 @@ import { CommandPalette, type ThemeMode } from "@/components/app/command-palette
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteList } from "@/components/notes/note-list";
 import {
+  getSavedBackupDirectoryHandle,
+  isTauriDesktop,
+  pickBackupDirectory,
+  supportsDirectoryPicker,
+} from "@/lib/notes/local-mirror";
+import {
   DEFAULT_GROUP,
   collectFolders,
   collectShareGroups,
@@ -226,7 +232,14 @@ function NotesWorkspace({ userId, email, adapter, client, onSignOut, onSignIn, b
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [backupFolderName, setBackupFolderName] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void getSavedBackupDirectoryHandle().then((handle) => {
+      if (handle?.name) setBackupFolderName(handle.name);
+    });
+  }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Note | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -1595,6 +1608,32 @@ async function handleDeleteForever() {
                 <button type="button" onClick={() => importInputRef.current?.click()}>
                   <Upload aria-hidden="true" /> Import notes (.json, .md, .txt)
                 </button>
+                {isTauriDesktop() ? (
+                  <button
+                    type="button"
+                    disabled
+                    title="Auto-mirroring live & daily JSON backups to %LOCALAPPDATA%\com.tethernotes.app\backups\"
+                  >
+                    <Database aria-hidden="true" /> Auto-backup active (C:\ AppData)
+                  </button>
+                ) : supportsDirectoryPicker() ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void pickBackupDirectory(notesWithDraft)
+                        .then((picked) => {
+                          if (picked) setBackupFolderName(picked);
+                        })
+                        .catch(() => {});
+                    }}
+                    title="Choose a local folder on this PC to automatically mirror tether-notes-live.json on every edit/sync"
+                  >
+                    <Folder aria-hidden="true" />{" "}
+                    {backupFolderName
+                      ? `Auto-backup folder: ${backupFolderName}`
+                      : "Set auto-backup folder (PC)…"}
+                  </button>
+                ) : null}
                 <input
                   ref={importInputRef}
                   type="file"
