@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getNotesDatabase } from "@/lib/db/database";
 import { NotesRepository } from "@/lib/db/repository";
+import { exportNotesJson } from "@/lib/notes/export";
 import { createDraftNote } from "@/lib/notes/model";
 import { selectExpired } from "@/lib/notes/trash";
 import type { Note } from "@/lib/notes/types";
@@ -133,6 +134,40 @@ export function useNotesWorkspace(
 
   const notes =
     adapter !== null && userId !== null ? (serverNotes ?? localNotes) : localNotes;
+
+  // Automatic C:\ local disk mirror on Windows Desktop (Tauri shell):
+  // Mirrors every local edit or remote sync arrival from iOS/Android/Supabase
+  // into %LOCALAPPDATA%\com.tethernotes.app\backups\tether-notes-live.json.
+  useEffect(() => {
+    if (!notes || notes.length === 0 || typeof window === "undefined") {
+      return;
+    }
+    const tauriInternals = (
+      window as Window & {
+        __TAURI_INTERNALS__?: {
+          invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+        };
+      }
+    ).__TAURI_INTERNALS__;
+    if (typeof tauriInternals?.invoke !== "function") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      try {
+        const payload = exportNotesJson(notes);
+        const dateStamp = new Date().toISOString().slice(0, 10);
+        void tauriInternals.invoke?.("save_local_backup", {
+          payload,
+          dateStamp,
+        });
+      } catch {
+        // Ignore background mirror errors so UI editing is never interrupted.
+      }
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [notes]);
 
   const pending = useLiveQuery(async () => {
     if (!repository) {

@@ -1,7 +1,47 @@
+use std::fs;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 const MINI_LABEL: &str = "mini";
+
+#[tauri::command]
+fn save_local_backup(
+    app: tauri::AppHandle,
+    payload: String,
+    date_stamp: Option<String>,
+) -> Result<String, String> {
+    // Resolves to %LOCALAPPDATA%\com.tethernotes.app\backups on Windows (C:\Users\<User>\AppData\Local\com.tethernotes.app\backups)
+    let base_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|err| format!("failed to resolve app_local_data_dir: {err}"))?;
+    let backup_dir = base_dir.join("backups");
+    fs::create_dir_all(&backup_dir)
+        .map_err(|err| format!("failed to create backup directory: {err}"))?;
+
+    let live_path = backup_dir.join("tether-notes-live.json");
+    let tmp_path = backup_dir.join("tether-notes-live.json.tmp");
+    fs::write(&tmp_path, payload.as_bytes())
+        .map_err(|err| format!("failed to write temporary backup file: {err}"))?;
+    fs::rename(&tmp_path, &live_path)
+        .or_else(|_| fs::copy(&tmp_path, &live_path).map(|_| ()))
+        .map_err(|err| format!("failed to finalize live backup file: {err}"))?;
+    let _ = fs::remove_file(&tmp_path);
+
+    if let Some(raw_date) = date_stamp {
+        let safe_date: String = raw_date
+            .chars()
+            .filter(|c| c.is_ascii_digit() || *c == '-')
+            .take(10)
+            .collect();
+        if safe_date.len() == 10 {
+            let daily_path = backup_dir.join(format!("tether-notes-{safe_date}.json"));
+            let _ = fs::write(daily_path, payload.as_bytes());
+        }
+    }
+
+    Ok(live_path.to_string_lossy().into_owned())
+}
 
 fn toggle_mini(app: &tauri::AppHandle) {
     let Some(window) = app.get_webview_window(MINI_LABEL) else {
@@ -64,6 +104,7 @@ pub fn run() {
                 })
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![save_local_backup])
         .setup(|app| {
             // A failure here must never abort startup: another instance (or another
             // app) may already own the hotkey, which would otherwise force-close.
