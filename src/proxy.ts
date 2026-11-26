@@ -43,8 +43,8 @@ export function proxy(request: NextRequest) {
     "media-src 'self' data: blob: https://*.supabase.co",
     "font-src 'self' data:",
     // BYOK AI summary posts to the user's own OpenAI-compatible endpoint, so any
-    // https origin must be allowed. Documented as a tradeoff in README.
-    "connect-src 'self' https: wss:",
+    // https origin must be allowed. WebSocket is locked to Supabase Realtime.
+    "connect-src 'self' https: wss://*.supabase.co",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
