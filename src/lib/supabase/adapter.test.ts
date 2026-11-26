@@ -89,11 +89,15 @@ describe("Supabase note mapping", () => {
     expect(unlocked.lockHash).toBeNull();
 
     const locked = grantedRowToNote(
-      { ...base, body: null, is_locked: true },
+      { ...base, title: "Secret title", body: null, is_locked: true },
       "current-user",
     );
+    expect(locked.title).toBe("");
     expect(locked.body).toBe("");
     expect(locked.lockHash).toBe("locked");
+
+    const lockedWs = noteToRemoteRow({ ...note, lockHash: "salt:hash", workspaceId: "11111111-1111-4111-8111-111111111111" });
+    expect(lockedWs.workspace_id).toBeNull();
   });
 
   test("combinePulledNotes dedupes notes visible via both table and grants", () => {

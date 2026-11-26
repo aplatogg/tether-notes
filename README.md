@@ -6,7 +6,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
   <img alt="Tauri" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-161%20passing-0F766E">
+  <a href="https://github.com/aplatogg/tether-notes/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/aplatogg/tether-notes/ci.yml?branch=main&label=CI%20%28lint%20%C2%B7%20types%20%C2%B7%20tests%29"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/aplatogg/tether-notes?color=0F766E"></a>
 </p>
 
@@ -85,7 +85,7 @@ These are public browser credentials — never put a service-role key here or in
 | `pnpm dev` | Start the Next.js dev server |
 | `pnpm lint` | ESLint, zero warnings allowed |
 | `pnpm typecheck` | Route types + strict TypeScript |
-| `pnpm test --run` | Run the Vitest suite once (161 tests) |
+| `pnpm test --run` | Run the Vitest suite once (203 tests) |
 | `pnpm build` | Production build (Vercel) |
 | `pnpm desktop:build` | Static export (`out/`) for the desktop shell |
 | `pnpm tauri:dev` / `pnpm tauri:build` | Run / build the Windows desktop app |

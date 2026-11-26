@@ -58,12 +58,13 @@ export async function fetchSharedNote(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
 
+  const isLocked = row.is_locked === true;
   return {
     id: row.id,
-    title: row.title ?? "",
-    body: row.body,
+    title: isLocked ? "" : (row.title ?? ""),
+    body: isLocked ? null : row.body,
     updatedAt: row.updated_at,
-    isLocked: row.is_locked === true,
+    isLocked,
   };
 }
 

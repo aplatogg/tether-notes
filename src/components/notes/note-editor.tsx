@@ -197,8 +197,9 @@ export function NoteEditor({
   async function submitPin() {
     if (!note || !pinMode) return;
 
-    if (pin.trim().length < 4) {
-      setPinError("Use at least 4 characters.");
+    const minPinLength = pinMode === "set" ? 8 : 4;
+    if (pin.trim().length < minPinLength) {
+      setPinError(`Use at least ${minPinLength} characters.`);
       return;
     }
 
@@ -208,7 +209,7 @@ export function NoteEditor({
       setDecryptedBodies((current) => ({ ...current, [note.id]: displayBody }));
       setUnlockedPins((current) => ({ ...current, [note.id]: pin }));
       setUnlocked((current) => ({ ...current, [note.id]: true }));
-      onChange({ lockHash: secret, body: encrypted });
+      onChange({ lockHash: secret, body: encrypted, workspaceId: null });
     } else {
       const plaintext = note.lockHash
         ? await decryptLockedBody(note.body, pin, note.lockHash)
@@ -666,7 +667,7 @@ export function NoteEditor({
                 <h2>{pinMode === "set" ? "Lock this note" : pinMode === "unlock" ? "Unlock note" : "Remove lock"}</h2>
                 <p>
                   {pinMode === "set"
-                    ? "Choose a PIN with at least 4 characters. The note body is encrypted with AES-256-GCM."
+                    ? "Choose a PIN or passphrase with at least 8 characters. The note body is encrypted with AES-256-GCM and kept in Personal (not shared workspaces)."
                     : pinMode === "unlock"
                       ? "Enter the PIN you set for this note."
                       : "Enter the current PIN to decrypt and remove the lock."}

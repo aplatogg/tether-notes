@@ -175,15 +175,22 @@ export function WorkspaceSelect({
   readOnly: boolean;
   onChange: (changes: Partial<Note>) => void;
 }) {
+  const locked = Boolean(note.lockHash);
   return (
-    <label className={note.workspaceId ? "meta-pill is-filled" : "meta-pill"} title="Workspace">
+    <label
+      className={note.workspaceId ? "meta-pill is-filled" : "meta-pill"}
+      title={locked ? "Locked notes stay in Personal — remove the lock before moving to a workspace" : "Workspace"}
+    >
       <Briefcase aria-hidden="true" />
       <span className="sr-only">Workspace</span>
       <select
         aria-label="Workspace"
         value={note.workspaceId ?? ""}
-        disabled={readOnly}
-        onChange={(event) => onChange({ workspaceId: event.target.value || null })}
+        disabled={readOnly || locked}
+        onChange={(event) => {
+          if (locked) return;
+          onChange({ workspaceId: event.target.value || null });
+        }}
       >
         <option value="">Personal</option>
         {workspaces.map((workspace) => (

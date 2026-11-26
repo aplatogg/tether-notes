@@ -80,7 +80,7 @@ function SharedNoteView() {
 
         {note ? (
           <>
-            <h1 className="share-title">{note.title || "Untitled note"}</h1>
+            <h1 className="share-title">{note.isLocked ? "Locked note" : (note.title || "Untitled note")}</h1>
             {note.isLocked || note.body === null ? (
               <p className="share-status">
                 <Lock aria-hidden="true" /> The owner locked this note, so its content is not shared.
