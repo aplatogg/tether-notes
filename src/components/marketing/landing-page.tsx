@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthCallbackForwarder } from "@/components/marketing/auth-callback-forwarder";
 import {
   ArrowRight,
   Cloud,
@@ -124,6 +125,7 @@ const PLANS = [
 export function LandingPage() {
   return (
     <div className="landing-shell">
+      <AuthCallbackForwarder />
       <header className="landing-nav-wrap">
         <div className="landing-container landing-nav">
           <Link className="brand-lockup landing-brand" href="/">

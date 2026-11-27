@@ -36,6 +36,9 @@ export function AuthPanel({ client, initialError = null, onContinueLocal }: Auth
         const { data, error: signUpError } = await client.auth.signUp({
           email: email.trim(),
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/app`,
+          },
         });
 
         if (signUpError) {
