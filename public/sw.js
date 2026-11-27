@@ -1,5 +1,5 @@
-const STATIC_CACHE = "tether-static-v2";
-const APP_SHELL = ["/", "/app", "/offline", "/privacy", "/manifest.webmanifest", "/icon.svg", "/icon-maskable.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const STATIC_CACHE = "tether-static-v3";
+const APP_SHELL = ["/", "/offline", "/privacy", "/manifest.webmanifest", "/icon.svg", "/icon-maskable.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

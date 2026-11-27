@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Tether Notes",
     short_name: "Tether",
     description: "A local-first notes workspace that keeps writing available offline.",
-    start_url: "/app",
+    start_url: "/",
     scope: "/",
     display: "standalone",
     background_color: "#eaf0f2",

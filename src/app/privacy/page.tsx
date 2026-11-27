@@ -68,9 +68,7 @@ export default function PrivacyPage() {
         </p>
 
         <p className="auth-foot">
-          <Link href="/">← Home</Link>
-          {" · "}
-          <Link href="/app">Open Workspace</Link>
+          <Link href="/">← Back to Tether Notes</Link>
         </p>
       </section>
     </main>

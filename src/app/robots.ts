@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: ["/", "/privacy"],
-        disallow: ["/app", "/mini", "/s", "/offline"],
+        disallow: ["/mini", "/s", "/offline"],
       },
     ],
     sitemap: "https://tethernotes.me/sitemap.xml",

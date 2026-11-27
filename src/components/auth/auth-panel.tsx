@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ArrowRight, LoaderCircle } from "lucide-react";
@@ -36,9 +35,6 @@ export function AuthPanel({ client, initialError = null, onContinueLocal }: Auth
         const { data, error: signUpError } = await client.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/app`,
-          },
         });
 
         if (signUpError) {
@@ -153,9 +149,7 @@ export function AuthPanel({ client, initialError = null, onContinueLocal }: Auth
           ) : null}
         </form>
         <p className="auth-foot">
-          <Link href="/">Home</Link>
-          {" · "}
-          <Link href="/privacy">Privacy</Link>
+          <a href="/privacy">Privacy</a>
         </p>
       </section>
     </main>

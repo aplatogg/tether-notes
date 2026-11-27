@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  👉 <a href="https://tethernotes.me"><b>Visit website</b></a> · 👉 <a href="https://tethernotes.me/app"><b>Open the live app</b></a> · 👉 <a href="https://github.com/aplatogg/tether-notes/releases/latest"><b>Grab the desktop build</b></a>
+  👉 <a href="https://tethernotes.me"><b>Open the live app</b></a> · 👉 <a href="https://github.com/aplatogg/tether-notes/releases/latest"><b>Grab the desktop build</b></a>
 </p>
 
 ---
@@ -65,7 +65,7 @@ Copy-Item .env.example .env.local   # optional: add Supabase vars for sync
 pnpm dev
 ```
 
-Open `http://localhost:3000/app` for the workspace (or `http://localhost:3000` for the landing page). With the env values blank, the app runs fully local (IndexedDB only) — perfect for trying it out.
+Open `http://localhost:3000`. With the env values blank, the app runs fully local (IndexedDB only) — perfect for trying it out.
 
 ## 🔐 Supabase mode (sync + accounts)
 

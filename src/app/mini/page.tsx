@@ -20,7 +20,7 @@ async function hideWindow() {
 
 async function openMainWindow() {
   if (!isTauri()) {
-    window.open("/app", "_blank", "noopener");
+    window.open("/", "_blank", "noopener");
     return;
   }
   const { Window } = await import("@tauri-apps/api/window");
