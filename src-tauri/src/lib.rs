@@ -1,7 +1,8 @@
 use std::fs;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, Theme, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+const MAIN_LABEL: &str = "main";
 const MINI_LABEL: &str = "mini";
 
 #[tauri::command]
@@ -78,16 +79,43 @@ fn create_mini_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+fn show_or_create_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return;
+    }
+
+    if let Ok(window) = WebviewWindowBuilder::new(app, MAIN_LABEL, WebviewUrl::default())
+        .title("Tether Notes")
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(380.0, 520.0)
+        .resizable(true)
+        .center()
+        .decorations(true)
+        .theme(Some(Theme::Light))
+        .build()
+    {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            show_or_create_main_window(app);
         }))
+        .on_window_event(|window, event| {
+            // Closing the main window must exit the app cleanly; otherwise the
+            // hidden quick-capture ("mini") window keeps the process alive with
+            // no visible window and blocks future launches via single-instance.
+            if window.label() == MAIN_LABEL && matches!(event, WindowEvent::CloseRequested { .. }) {
+                window.app_handle().exit(0);
+            }
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
