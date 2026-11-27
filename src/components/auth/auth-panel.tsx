@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ArrowRight, LoaderCircle } from "lucide-react";
@@ -149,7 +150,9 @@ export function AuthPanel({ client, initialError = null, onContinueLocal }: Auth
           ) : null}
         </form>
         <p className="auth-foot">
-          <a href="/privacy">Privacy</a>
+          <Link href="/">Home</Link>
+          {" · "}
+          <Link href="/privacy">Privacy</Link>
         </p>
       </section>
     </main>

@@ -9,12 +9,22 @@ import "./globals.css";
 import "./highlights.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://tethernotes.me"),
   title: {
-    default: "Tether Notes",
+    default: "Tether Notes — Local-First Notes & Team Workspaces",
     template: "%s | Tether Notes",
   },
-  description: "A local-first notes workspace.",
+  description:
+    "Local-first notes and collaborative workspaces built for speed, offline reliability, and defense-in-depth privacy across web and desktop.",
   applicationName: "Tether Notes",
+  openGraph: {
+    title: "Tether Notes — Local-First Notes & Team Workspaces",
+    description:
+      "Write offline in local storage, synchronize in real time across devices, and protect team knowledge with PostgreSQL row-level security.",
+    url: "https://tethernotes.me",
+    siteName: "Tether Notes",
+    type: "website",
+  },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
